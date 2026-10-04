@@ -9,8 +9,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- Tone.js Procedural Sound Design -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-  <!-- PeerJS for GitHub Pages Serverless WebRTC Multiplayer -->
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- PeerJS for GitHub Pages Serverless WebRTC Multiplayer (Reliable CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Black+Ops+One&family=Rajdhani:wght@600;700;900&display=swap" rel="stylesheet">
@@ -238,6 +238,7 @@
         <div class="flex items-center gap-2">
           <span id="room-code-display" class="jjs-font text-3xl font-black text-white tracking-widest bg-gray-900 px-4 py-1.5 rounded-lg border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">----</span>
           <button id="btn-copy-code" class="bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 text-cyan-300 px-3 py-2 rounded-lg text-xs font-bold transition active:scale-95">COPY</button>
+          <button id="btn-copy-link" class="bg-cyan-900 hover:bg-cyan-800 border border-cyan-500 text-cyan-200 px-3 py-2 rounded-lg text-xs font-bold transition active:scale-95">COPY LINK</button>
         </div>
         <div class="flex items-center gap-2 text-xs text-gray-400">
           <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
@@ -459,6 +460,19 @@
   </div>
 
   <script>
+    // Gracefully intercept Canvas sandbox WebSocket restrictions
+    window.addEventListener('error', (event) => {
+      if (event && event.message && (event.message.includes('WebSocket') || event.message.includes('Canvas') || event.message.includes('SecurityError'))) {
+        if (event.preventDefault) event.preventDefault();
+        const hostStatus = document.getElementById('host-status-text');
+        const joinStatus = document.getElementById('join-status-text');
+        const msg = "Notice: Canvas preview sandbox disallows WebSockets. On your live GitHub Pages site, multiplayer connects normally!";
+        if (hostStatus) hostStatus.innerText = msg;
+        if (joinStatus) joinStatus.innerText = msg;
+        return true;
+      }
+    });
+
     let audioInitialized = false;
     let masterVolume = null;
     let hitSynth = null;
@@ -1247,172 +1261,184 @@
       const root = new THREE.Group();
 
       const skinMat = new THREE.MeshStandardMaterial({ 
-        color: isYuji ? 0xf6c8aa : 0xdfd3ca, 
-        roughness: 0.55 
+        color: isYuji ? 0xf7caa9 : 0xdad1c7, 
+        roughness: 0.52 
       });
       const uniformMat = new THREE.MeshStandardMaterial({
-        color: isYuji ? 0x111625 : 0x1a1c24,
-        roughness: 0.65
+        color: isYuji ? 0x0f1422 : 0x181c25,
+        roughness: 0.62
       });
       const beltMat = new THREE.MeshStandardMaterial({
-        color: 0x0a0c12,
-        roughness: 0.5
+        color: 0x08090f,
+        roughness: 0.45
       });
       const buckleMat = new THREE.MeshStandardMaterial({
-        color: 0xd1d5db,
-        metalness: 0.85,
-        roughness: 0.2
+        color: 0xe5e7eb,
+        metalness: 0.9,
+        roughness: 0.15
       });
       const shoeMat = new THREE.MeshStandardMaterial({
-        color: isYuji ? 0xb91c1c : 0x111625,
-        roughness: 0.5
+        color: isYuji ? 0xbe123c : 0x111625,
+        roughness: 0.45
       });
       const shoeSoleMat = new THREE.MeshStandardMaterial({
-        color: 0xe5e7eb,
-        roughness: 0.7
+        color: 0xf3f4f6,
+        roughness: 0.65
       });
       const hairMat = new THREE.MeshStandardMaterial({
-        color: isYuji ? 0xee7394 : 0x76889b,
-        roughness: 0.75
+        color: isYuji ? 0xf472b6 : 0x64748b,
+        roughness: 0.72
       });
       const hairDarkMat = new THREE.MeshStandardMaterial({
-        color: isYuji ? 0x24141c : 0x485869,
-        roughness: 0.8
+        color: isYuji ? 0x1c1117 : 0x334155,
+        roughness: 0.82
       });
       const wrapMat = new THREE.MeshStandardMaterial({
-        color: 0xdedede,
-        roughness: 0.9
+        color: 0xededed,
+        roughness: 0.88
       });
 
-      const pelvisGeo = new THREE.BoxGeometry(0.86, 0.44, 0.54);
+      const pelvisGeo = new THREE.BoxGeometry(0.88, 0.44, 0.54);
       const pelvis = new THREE.Mesh(pelvisGeo, uniformMat);
       pelvis.castShadow = true;
       pelvis.position.y = 1.6;
       root.add(pelvis);
 
-      const belt = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.1, 0.56), beltMat);
+      const belt = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 0.56), beltMat);
       belt.position.y = 0.18;
       pelvis.add(belt);
 
-      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.05), buckleMat);
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.05), buckleMat);
       buckle.position.set(0, 0.18, 0.29);
       pelvis.add(buckle);
 
-      const torsoGeo = new THREE.BoxGeometry(0.96, 0.98, 0.58);
+      const torsoGeo = new THREE.BoxGeometry(0.98, 1.0, 0.6);
       const torso = new THREE.Mesh(torsoGeo, uniformMat);
       torso.castShadow = true;
-      torso.position.y = 0.66;
+      torso.position.y = 0.68;
       pelvis.add(torso);
 
       if (isYuji) {
-        const hoodCollarGeo = new THREE.BoxGeometry(0.82, 0.32, 0.66);
-        const hoodMat = new THREE.MeshStandardMaterial({ color: 0xba1818, roughness: 0.65 });
+        // Red Hood Collar & Folded Back
+        const hoodCollarGeo = new THREE.BoxGeometry(0.88, 0.34, 0.68);
+        const hoodMat = new THREE.MeshStandardMaterial({ color: 0xc41427, roughness: 0.6 });
         const hoodCollar = new THREE.Mesh(hoodCollarGeo, hoodMat);
-        hoodCollar.position.set(0, 0.44, 0.02);
+        hoodCollar.position.set(0, 0.45, 0.02);
         torso.add(hoodCollar);
 
-        const hoodBackGeo = new THREE.BoxGeometry(0.58, 0.45, 0.26);
+        const hoodBackGeo = new THREE.BoxGeometry(0.64, 0.48, 0.28);
         const hoodBack = new THREE.Mesh(hoodBackGeo, hoodMat);
-        hoodBack.position.set(0, 0.32, -0.34);
-        hoodBack.rotation.x = -0.25;
+        hoodBack.position.set(0, 0.32, -0.36);
+        hoodBack.rotation.x = -0.28;
         torso.add(hoodBack);
 
-        const buttonGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.06, 12);
-        const buttonMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.2 });
+        const buttonGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.07, 16);
+        const buttonMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.95, roughness: 0.15 });
         const button = new THREE.Mesh(buttonGeo, buttonMat);
         button.rotation.x = Math.PI / 2;
-        button.position.set(0.12, 0.22, 0.31);
+        button.position.set(0.14, 0.24, 0.32);
         torso.add(button);
       } else {
-        const stitchMat = new THREE.MeshBasicMaterial({ color: 0x222a36 });
-        const bodyStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.03), stitchMat);
-        bodyStitchH.position.set(0.12, 0.1, 0.3);
+        const stitchMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+        const bodyStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.035), stitchMat);
+        bodyStitchH.position.set(0.12, 0.1, 0.31);
         torso.add(bodyStitchH);
         for (let st = -2; st <= 2; st++) {
-          const cross1 = new THREE.Mesh(new THREE.PlaneGeometry(0.025, 0.08), stitchMat);
-          cross1.position.set(0.12 + st * 0.1, 0.1, 0.302);
+          const cross1 = new THREE.Mesh(new THREE.PlaneGeometry(0.025, 0.09), stitchMat);
+          cross1.position.set(0.12 + st * 0.11, 0.1, 0.312);
           torso.add(cross1);
-          const cross2 = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.025), stitchMat);
-          cross2.position.set(0.12 + st * 0.1, 0.1, 0.302);
+          const cross2 = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.025), stitchMat);
+          cross2.position.set(0.12 + st * 0.11, 0.1, 0.312);
           torso.add(cross2);
         }
       }
 
       const headPivot = new THREE.Group();
-      headPivot.position.y = 0.56;
+      headPivot.position.y = 0.58;
       torso.add(headPivot);
 
-      const headGeo = new THREE.BoxGeometry(0.56, 0.62, 0.56);
+      const headGeo = new THREE.BoxGeometry(0.58, 0.62, 0.58);
       const head = new THREE.Mesh(headGeo, skinMat);
-      head.position.y = 0.33;
+      head.position.y = 0.34;
       head.castShadow = true;
       headPivot.add(head);
 
-      const hairBaseGeo = new THREE.BoxGeometry(0.62, 0.3, 0.62);
+      const hairBaseGeo = new THREE.BoxGeometry(0.64, 0.32, 0.64);
       const hairBase = new THREE.Mesh(hairBaseGeo, isYuji ? hairDarkMat : hairMat);
-      hairBase.position.y = 0.26;
+      hairBase.position.y = 0.28;
       head.add(hairBase);
 
       if (isYuji) {
-        const spikeGeo = new THREE.ConeGeometry(0.14, 0.36, 4);
-        for (let s = 0; s < 10; s++) {
+        // Detailed 3D Hair Spikes with layered crest
+        const spikeGeo = new THREE.ConeGeometry(0.13, 0.38, 4);
+        for (let s = 0; s < 12; s++) {
           const spike = new THREE.Mesh(spikeGeo, hairMat);
-          const sAng = (s / 10) * Math.PI * 2;
-          spike.position.set(Math.cos(sAng) * 0.24, 0.32, Math.sin(sAng) * 0.24);
-          spike.rotation.z = -Math.cos(sAng) * 0.42;
-          spike.rotation.x = Math.sin(sAng) * 0.42;
+          const sAng = (s / 12) * Math.PI * 2;
+          spike.position.set(Math.cos(sAng) * 0.25, 0.34, Math.sin(sAng) * 0.25);
+          spike.rotation.z = -Math.cos(sAng) * 0.45;
+          spike.rotation.x = Math.sin(sAng) * 0.45;
           head.add(spike);
         }
+        for (let s = 0; s < 5; s++) {
+          const centerSpike = new THREE.Mesh(spikeGeo, hairMat);
+          const cAng = (s / 5) * Math.PI * 2;
+          centerSpike.position.set(Math.cos(cAng) * 0.12, 0.44, Math.sin(cAng) * 0.12);
+          centerSpike.rotation.z = -Math.cos(cAng) * 0.25;
+          centerSpike.rotation.x = Math.sin(cAng) * 0.25;
+          head.add(centerSpike);
+        }
       } else {
-        const tailGeo = new THREE.CylinderGeometry(0.09, 0.04, 0.82, 6);
+        // Mahito long braided ponytail tendrils
+        const tailGeo = new THREE.CylinderGeometry(0.09, 0.03, 0.95, 6);
         const leftTail = new THREE.Mesh(tailGeo, hairMat);
-        leftTail.position.set(-0.24, -0.05, -0.22);
-        leftTail.rotation.set(-0.4, 0, -0.3);
+        leftTail.position.set(-0.25, -0.08, -0.24);
+        leftTail.rotation.set(-0.45, 0, -0.32);
         head.add(leftTail);
 
         const rightTail = new THREE.Mesh(tailGeo, hairMat);
-        rightTail.position.set(0.24, -0.05, -0.22);
-        rightTail.rotation.set(-0.4, 0, 0.3);
+        rightTail.position.set(0.25, -0.08, -0.24);
+        rightTail.rotation.set(-0.45, 0, 0.32);
         head.add(rightTail);
       }
 
-      const leftEye = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.05), new THREE.MeshBasicMaterial({ color: isYuji ? 0x111111 : 0x00f0ff }));
-      leftEye.position.set(-0.14, 0.06, 0.285);
+      // Eyes
+      const leftEye = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.055), new THREE.MeshBasicMaterial({ color: isYuji ? 0x0f172a : 0x06b6d4 }));
+      leftEye.position.set(-0.15, 0.07, 0.295);
       head.add(leftEye);
 
-      const rightEye = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.05), new THREE.MeshBasicMaterial({ color: isYuji ? 0x111111 : 0x222a36 }));
-      rightEye.position.set(0.14, 0.06, 0.285);
+      const rightEye = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.055), new THREE.MeshBasicMaterial({ color: isYuji ? 0x0f172a : 0x334155 }));
+      rightEye.position.set(0.15, 0.07, 0.295);
       head.add(rightEye);
 
       if (isYuji) {
-        const scarMat = new THREE.MeshBasicMaterial({ color: 0x580f1d });
-        const leftScar = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.025), scarMat);
-        leftScar.position.set(-0.14, -0.03, 0.286);
+        const scarMat = new THREE.MeshBasicMaterial({ color: 0x7f1d1d });
+        const leftScar = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 0.028), scarMat);
+        leftScar.position.set(-0.15, -0.035, 0.296);
         head.add(leftScar);
         const rightScar = leftScar.clone();
-        rightScar.position.x = 0.14;
+        rightScar.position.x = 0.15;
         head.add(rightScar);
       } else {
-        const stitchFaceMat = new THREE.MeshBasicMaterial({ color: 0x222a36 });
-        const faceStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.02), stitchFaceMat);
-        faceStitchH.position.set(0.02, 0.01, 0.286);
+        const stitchFaceMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+        const faceStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.024), stitchFaceMat);
+        faceStitchH.position.set(0.02, 0.015, 0.296);
         faceStitchH.rotation.z = 0.32;
         head.add(faceStitchH);
         for (let st = -2; st <= 2; st++) {
-          const cross = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.06), stitchFaceMat);
-          cross.position.set(0.02 + st * 0.06, 0.01 + st * 0.02, 0.287);
+          const cross = new THREE.Mesh(new THREE.PlaneGeometry(0.022, 0.07), stitchFaceMat);
+          cross.position.set(0.02 + st * 0.07, 0.015 + st * 0.023, 0.297);
           head.add(cross);
         }
       }
 
       const shoulderGeo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
       const upperArmGeo = new THREE.BoxGeometry(0.32, 0.54, 0.32);
-      const forearmGeo = new THREE.BoxGeometry(0.28, 0.5, 0.28);
-      const fistGeo = new THREE.BoxGeometry(0.26, 0.26, 0.28);
+      const forearmGeo = new THREE.BoxGeometry(0.29, 0.5, 0.29);
+      const fistGeo = new THREE.BoxGeometry(0.28, 0.28, 0.3);
 
       // Left Arm
       const leftArmPivot = new THREE.Group();
-      leftArmPivot.position.set(-0.68, 0.35, 0);
+      leftArmPivot.position.set(-0.7, 0.35, 0);
       const leftShoulder = new THREE.Mesh(shoulderGeo, uniformMat);
       leftArmPivot.add(leftShoulder);
 
@@ -1431,7 +1457,7 @@
       leftElbow.add(leftForearm);
 
       if (isYuji) {
-        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.1, 0.33), new THREE.MeshStandardMaterial({ color: 0xba1818, roughness: 0.6 }));
+        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.34), new THREE.MeshStandardMaterial({ color: 0xc41427, roughness: 0.6 }));
         cuff.position.y = -0.15;
         leftForearm.add(cuff);
       }
@@ -1443,7 +1469,7 @@
 
       // Right Arm
       const rightArmPivot = new THREE.Group();
-      rightArmPivot.position.set(0.68, 0.35, 0);
+      rightArmPivot.position.set(0.7, 0.35, 0);
       const rightShoulder = new THREE.Mesh(shoulderGeo, uniformMat);
       rightArmPivot.add(rightShoulder);
 
@@ -1462,7 +1488,7 @@
       rightElbow.add(rightForearm);
 
       if (isYuji) {
-        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.1, 0.33), new THREE.MeshStandardMaterial({ color: 0xba1818, roughness: 0.6 }));
+        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.34), new THREE.MeshStandardMaterial({ color: 0xc41427, roughness: 0.6 }));
         cuff.position.y = -0.15;
         rightForearm.add(cuff);
       }
@@ -1472,81 +1498,81 @@
       rightForearm.add(rightFist);
       torso.add(rightArmPivot);
 
-      const thighGeo = new THREE.BoxGeometry(0.36, 0.7, 0.36);
-      const calfGeo = new THREE.BoxGeometry(0.32, 0.65, 0.32);
-      const bootGeo = new THREE.BoxGeometry(0.36, 0.28, 0.48);
-      const soleGeo = new THREE.BoxGeometry(0.37, 0.06, 0.5);
-      const toeCapGeo = new THREE.BoxGeometry(0.37, 0.12, 0.14);
+      const thighGeo = new THREE.BoxGeometry(0.37, 0.72, 0.37);
+      const calfGeo = new THREE.BoxGeometry(0.33, 0.66, 0.33);
+      const bootGeo = new THREE.BoxGeometry(0.37, 0.3, 0.5);
+      const soleGeo = new THREE.BoxGeometry(0.39, 0.07, 0.52);
+      const toeCapGeo = new THREE.BoxGeometry(0.38, 0.13, 0.15);
 
       // Left Leg
       const leftLegPivot = new THREE.Group();
-      leftLegPivot.position.set(-0.26, -0.2, 0);
+      leftLegPivot.position.set(-0.27, -0.2, 0);
       const leftThigh = new THREE.Mesh(thighGeo, uniformMat);
-      leftThigh.position.y = -0.35;
+      leftThigh.position.y = -0.36;
       leftThigh.castShadow = true;
       leftLegPivot.add(leftThigh);
 
       const leftKnee = new THREE.Group();
-      leftKnee.position.y = -0.35;
+      leftKnee.position.y = -0.36;
       leftThigh.add(leftKnee);
 
       const leftCalf = new THREE.Mesh(calfGeo, uniformMat);
-      leftCalf.position.y = -0.32;
+      leftCalf.position.y = -0.33;
       leftCalf.castShadow = true;
       leftKnee.add(leftCalf);
 
       const leftBoot = new THREE.Mesh(bootGeo, shoeMat);
-      leftBoot.position.set(0, -0.32, 0.06);
+      leftBoot.position.set(0, -0.33, 0.07);
       leftBoot.castShadow = true;
       leftCalf.add(leftBoot);
 
       const leftSole = new THREE.Mesh(soleGeo, shoeSoleMat);
-      leftSole.position.set(0, -0.16, 0);
+      leftSole.position.set(0, -0.17, 0);
       leftBoot.add(leftSole);
 
       if (isYuji) {
         const leftToeCap = new THREE.Mesh(toeCapGeo, shoeSoleMat);
-        leftToeCap.position.set(0, -0.09, 0.18);
+        leftToeCap.position.set(0, -0.09, 0.19);
         leftBoot.add(leftToeCap);
       }
       pelvis.add(leftLegPivot);
 
       // Right Leg
       const rightLegPivot = new THREE.Group();
-      rightLegPivot.position.set(0.26, -0.2, 0);
+      rightLegPivot.position.set(0.27, -0.2, 0);
       const rightThigh = new THREE.Mesh(thighGeo, uniformMat);
-      rightThigh.position.y = -0.35;
+      rightThigh.position.y = -0.36;
       rightThigh.castShadow = true;
       rightLegPivot.add(rightThigh);
 
       const rightKnee = new THREE.Group();
-      rightKnee.position.y = -0.35;
+      rightKnee.position.y = -0.36;
       rightThigh.add(rightKnee);
 
       const rightCalf = new THREE.Mesh(calfGeo, uniformMat);
-      rightCalf.position.y = -0.32;
+      rightCalf.position.y = -0.33;
       rightCalf.castShadow = true;
       rightKnee.add(rightCalf);
 
       const rightBoot = new THREE.Mesh(bootGeo, shoeMat);
-      rightBoot.position.set(0, -0.32, 0.06);
+      rightBoot.position.set(0, -0.33, 0.07);
       rightBoot.castShadow = true;
       rightCalf.add(rightBoot);
 
       const rightSole = new THREE.Mesh(soleGeo, shoeSoleMat);
-      rightSole.position.set(0, -0.16, 0);
+      rightSole.position.set(0, -0.17, 0);
       rightBoot.add(rightSole);
 
       if (isYuji) {
         const rightToeCap = new THREE.Mesh(toeCapGeo, shoeSoleMat);
-        rightToeCap.position.set(0, -0.09, 0.18);
+        rightToeCap.position.set(0, -0.09, 0.19);
         rightBoot.add(rightToeCap);
       }
       pelvis.add(rightLegPivot);
 
       let auraMesh = null;
       if (isYuji) {
-        const auraGeo = new THREE.SphereGeometry(0.38, 12, 12);
+        const auraGeo = new THREE.SphereGeometry(0.4, 14, 14);
         const auraMat = new THREE.MeshBasicMaterial({
           color: 0xff002b,
           transparent: true,
@@ -1783,10 +1809,11 @@
         m1Step: 0,
         lastM1Time: 0,
         m1Lockout: 0,
+        gravityFloatTimer: 0,
         pos: yuji.root.position,
         vel: new THREE.Vector3(),
         rotY: Math.PI,
-        speed: 15.5,
+        speed: 18.0,
         isBlocking: false,
         isAirborne: false,
         hasDownslamReady: false,
@@ -2317,9 +2344,9 @@
     function triggerDummyDeath(explodeWithBlackFlash = false, preserveVelocity = false) {
       if (state.dummy.isDead) return;
       state.dummy.isDead = true;
-      state.dummy.respawnTimer = preserveVelocity ? 4.0 : 2.0;
+      state.dummy.respawnTimer = preserveVelocity ? 4.0 : (state.dummy.isHeadInGround ? 2.8 : 2.0);
 
-      if (!preserveVelocity) {
+      if (!preserveVelocity && !state.dummy.isHeadInGround) {
         state.dummy.state = 'DEAD';
         state.dummy.vel.set(0, 0, 0);
       }
@@ -2331,6 +2358,8 @@
         showHitBanner("KOKUSEN DEFEAT COLLAPSE!!");
       } else if (preserveVelocity) {
         showHitBanner("HORIZON BLASTOFF DEFEAT!!");
+      } else if (state.dummy.isHeadInGround) {
+        showHitBanner("BURIED IN THE SAND DEFEAT!!");
       } else {
         showHitBanner("OPPONENT COLLAPSED (RESPAWNING IN 2s)");
       }
@@ -2386,6 +2415,16 @@
       dummy.pelvis.position.y = 1.6;
       dummy.pelvis.rotation.set(0, 0, 0);
       dummy.torso.rotation.set(0, 0, 0);
+      dummy.head.position.set(0, 0.33, 0);
+      dummy.head.rotation.set(0, 0, 0);
+      dummy.leftArmPivot.rotation.set(0, 0, 0);
+      dummy.rightArmPivot.rotation.set(0, 0, 0);
+      dummy.leftLegPivot.rotation.set(0, 0, 0);
+      dummy.rightLegPivot.rotation.set(0, 0, 0);
+      dummy.leftElbow.rotation.set(0, 0, 0);
+      dummy.rightElbow.rotation.set(0, 0, 0);
+      dummy.leftKnee.rotation.set(0, 0, 0);
+      dummy.rightKnee.rotation.set(0, 0, 0);
       updateEnemyUI();
       showHitBanner(state.multiplayer.active ? "RIVAL RESPAWNED" : "MAHITO RESPAWNED");
     }
@@ -2684,23 +2723,40 @@
             if (isFinisherTarget) {
               state.player.state = 'ATTACKING';
               state.player.currentMove = 'DOWNSLAM_FINISHER';
-              state.player.actionDuration = 0.95;
-              state.player.actionTimer = 0.95;
+              state.player.actionDuration = 1.35;
+              state.player.actionTimer = 1.35;
 
-              state.player.vel.set(0, 16, 0);
-              state.dummy.vel.set(0, 16, 0);
+              state.player.vel.set(0, 17, 0);
+              state.dummy.vel.set(0, 17, 0);
               state.dummy.state = 'RAGDOLL';
 
               setTimeout(() => {
-                state.player.vel.set(0, -30, 0);
-                state.dummy.vel.set(0, -32, 0);
+                // Opponent driven violently downward into the sand
                 playPunchSound(true);
                 triggerAnimeImpactFrame();
                 triggerScreenShake(0.9);
                 spawnDebris(dummy.root.position, 22);
-                applyDamageToDummy(10, 'DOWN_SLAM', true);
+
+                const dummyTerrainY = getTerrainHeight(dummy.root.position.x, dummy.root.position.z);
+                dummy.root.position.y = dummyTerrainY;
+                dummy.root.position.x = yuji.root.position.x + Math.sin(state.player.rotY) * 1.8;
+                dummy.root.position.z = yuji.root.position.z + Math.cos(state.player.rotY) * 1.8;
+                state.dummy.vel.set(0, 0, 0);
                 state.dummy.isHeadInGround = true;
+                state.dummy.hp = 0;
+                updateEnemyUI();
+                triggerDummyDeath(false, false);
                 showHitBanner("HEAD-IN-GROUND DOWNSLAM FINISHER!!");
+
+                // Attacker hang-time: float suspended in air for 0.5s before falling
+                state.player.vel.set(0, 0, 0);
+                state.player.gravityFloatTimer = 0.5;
+
+                setTimeout(() => {
+                  if (state.player.currentMove === 'DOWNSLAM_FINISHER') {
+                    state.player.vel.y = -24;
+                  }
+                }, 500);
               }, 340);
             }
           }
@@ -3244,6 +3300,83 @@
       if (icon) icon.innerText = soundEnabled ? '🔊' : '🔇';
     });
 
+    function broadcastMultiplayer(packet) {
+      if (state.multiplayer.active && state.multiplayer.conn && state.multiplayer.conn.open) {
+        try {
+          state.multiplayer.conn.send(packet);
+        } catch (err) {
+          console.warn("Multiplayer packet broadcast failed:", err);
+        }
+      }
+    }
+
+    function setupMultiplayerDataHandlers(conn) {
+      conn.on('data', (data) => {
+        if (!data || typeof data !== 'object') return;
+
+        if (data.type === 'SYNC') {
+          dummy.root.position.set(data.x, data.y, data.z);
+          dummy.root.rotation.y = data.rotY;
+          state.dummy.rotY = data.rotY;
+          state.dummy.hp = data.hp;
+          state.dummy.isBlocking = !!data.isBlocking;
+          if (data.state) state.dummy.state = data.state;
+          updateEnemyUI();
+        } else if (data.type === 'MOVE_ACTION') {
+          if (data.move === 'M1') {
+            playPunchSound(data.step === 4);
+            state.dummy.state = 'ATTACKING';
+            state.dummy.attackDuration = 0.32;
+            state.dummy.attackTimer = 0.32;
+          } else if (data.move === 'SKILL_1') {
+            playPunchSound(false);
+            state.dummy.state = 'ATTACKING';
+            state.dummy.attackDuration = 0.45;
+            state.dummy.attackTimer = 0.45;
+          } else if (data.move === 'SKILL_2') {
+            playPunchSound(true);
+            state.dummy.state = 'ATTACKING';
+            state.dummy.attackDuration = 0.62;
+            state.dummy.attackTimer = 0.62;
+          } else if (data.move === 'SKILL_3') {
+            playPunchSound(true);
+            state.dummy.state = 'ATTACKING';
+            state.dummy.attackDuration = 0.65;
+            state.dummy.attackTimer = 0.65;
+          } else if (data.move === 'SKILL_4') {
+            playBlackFlashSound(1);
+            spawnBlackFlashShockwave(dummy.root.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 1.2);
+          } else if (data.move === 'DASH' || data.move === 'JUMP') {
+            playDodgeSound();
+          }
+        } else if (data.type === 'DAMAGE_APPLIED') {
+          if (!state.player.isDead) {
+            if (state.player.isBlocking && !data.isUnblockable) {
+              playPunchSound(false);
+              triggerScreenShake(0.1);
+            } else {
+              state.player.hp = Math.max(0, state.player.hp - data.dmg);
+              updatePlayerUI();
+              playPunchSound(true);
+              triggerScreenShake(0.35);
+              spawnDebris(yuji.root.position, 8);
+              state.player.state = 'STUNNED';
+              state.player.stunTimer = 0.7;
+              if (state.player.hp <= 0) {
+                triggerPlayerDeath();
+              }
+            }
+          }
+        } else if (data.type === 'AWAKEN_START') {
+          triggerScreenShake(0.5);
+          spawnBlackFlashShockwave(dummy.root.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 1.5);
+          showHitBanner("RIVAL ENTERED AWAKENING!");
+        } else if (data.type === 'PLAYER_DEATH') {
+          triggerDummyDeath(false);
+        }
+      });
+    }
+
     const menuOverlay = document.getElementById('main-menu-overlay');
     const menuPrimary = document.getElementById('menu-primary-actions');
     const menuHostBox = document.getElementById('menu-host-box');
@@ -3258,7 +3391,7 @@
           { urls: 'stun:stun2.l.google.com:19302' },
           { urls: 'stun:stun3.l.google.com:19302' },
           { urls: 'stun:stun4.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
+          { urls: 'stun:stun.cloudflare.com:3478' }
         ]
       }
     };
@@ -3305,6 +3438,7 @@
 
       if (state.multiplayer.conn) {
         try { state.multiplayer.conn.close(); } catch (e) {}
+        state.multiplayer.conn = null;
       }
       if (state.multiplayer.peer) {
         try { state.multiplayer.peer.destroy(); } catch (e) {}
@@ -3337,44 +3471,58 @@
         state.multiplayer.peer = null;
       }
 
-      const peerId = 'jjs-brawler-' + code;
-      const peer = new Peer(peerId, PEER_CONFIG);
-      state.multiplayer.peer = peer;
+      const peerId = 'jjs-brawler-' + code.toUpperCase();
+      try {
+        const peer = new Peer(peerId, PEER_CONFIG);
+        state.multiplayer.peer = peer;
 
-      peer.on('open', (id) => {
+        peer.on('open', (id) => {
+          if (codeDisplay) codeDisplay.innerText = code;
+          if (hostStatusText) hostStatusText.innerText = 'Room active! Waiting for friend to join...';
+        });
+
+        peer.on('connection', (conn) => {
+          if (hostStatusText) hostStatusText.innerText = 'Rival connecting...';
+          state.multiplayer.conn = conn;
+
+          const onReady = () => {
+            state.multiplayer.active = true;
+            setupMultiplayerDataHandlers(conn);
+            openGameArena(true);
+            showHitBanner("RIVAL CONNECTED! BATTLE START!");
+          };
+
+          if (conn.open) {
+            onReady();
+          } else {
+            conn.on('open', onReady);
+          }
+
+          conn.on('error', (err) => {
+            if (hostStatusText) hostStatusText.innerText = 'Connection error with peer. Waiting for retry...';
+          });
+
+          conn.on('close', () => {
+            state.multiplayer.active = false;
+            showHitBanner("RIVAL DISCONNECTED");
+          });
+        });
+
+        peer.on('error', (err) => {
+          if (err.type === 'unavailable-id') {
+            // If code collision occurs on broker, retry with new code
+            setTimeout(createHostPeer, 250);
+          } else {
+            if (hostStatusText) hostStatusText.innerText = 'Notice: ' + (err.type || 'Connection issue') + '. (Works on live GitHub Pages)';
+          }
+        });
+      } catch (err) {
+        console.warn("PeerJS initialization caught:", err);
         if (codeDisplay) codeDisplay.innerText = code;
-        if (hostStatusText) hostStatusText.innerText = 'Room active! Waiting for friend to join...';
-      });
-
-      peer.on('connection', (conn) => {
-        if (hostStatusText) hostStatusText.innerText = 'Rival connecting...';
-        state.multiplayer.conn = conn;
-
-        conn.on('open', () => {
-          state.multiplayer.active = true;
-          setupMultiplayerDataHandlers(conn);
-          openGameArena(true);
-          showHitBanner("RIVAL CONNECTED! BATTLE START!");
-        });
-
-        conn.on('error', (err) => {
-          if (hostStatusText) hostStatusText.innerText = 'Connection error with peer. Still waiting...';
-        });
-
-        conn.on('close', () => {
-          state.multiplayer.active = false;
-          showHitBanner("RIVAL DISCONNECTED");
-        });
-      });
-
-      peer.on('error', (err) => {
-        if (err.type === 'unavailable-id') {
-          // If code collision occurs on public broker, auto-retry with fresh code
-          createHostPeer();
-        } else {
-          if (hostStatusText) hostStatusText.innerText = 'Network notice: ' + (err.type || 'Connection issue') + '. Retrying...';
+        if (hostStatusText) {
+          hostStatusText.innerHTML = "<span class='text-amber-400'>Canvas preview blocks WebSockets.</span><br><span class='text-[10px] text-gray-300'>Publish to GitHub Pages for live multiplayer, or click Solo AI!</span>";
         }
-      });
+      }
     }
 
     document.getElementById('btn-menu-create').addEventListener('click', () => {
@@ -3388,11 +3536,39 @@
       if (!code || code === '...') return;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(code).catch(() => {});
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = code;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
       }
       const btn = document.getElementById('btn-copy-code');
       if (btn) {
         btn.innerText = 'COPIED!';
         setTimeout(() => { btn.innerText = 'COPY'; }, 1500);
+      }
+    });
+
+    document.getElementById('btn-copy-link').addEventListener('click', () => {
+      const code = state.multiplayer.roomCode;
+      if (!code || code === '...') return;
+      const shareUrl = window.location.origin + window.location.pathname + '?room=' + encodeURIComponent(code);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).catch(() => {});
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = shareUrl;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+      }
+      const btn = document.getElementById('btn-copy-link');
+      if (btn) {
+        btn.innerText = 'LINK COPIED!';
+        setTimeout(() => { btn.innerText = 'COPY LINK'; }, 1500);
       }
     });
 
@@ -3446,89 +3622,83 @@
         state.multiplayer.peer = null;
       }
 
-      const peer = new Peer(PEER_CONFIG);
-      state.multiplayer.peer = peer;
-      let hasOpened = false;
+      try {
+        const peer = new Peer(PEER_CONFIG);
+        state.multiplayer.peer = peer;
+        let hasOpened = false;
 
-      peer.on('open', () => {
-        if (statusText) statusText.innerText = "Finding room " + code + "...";
-        const targetId = 'jjs-brawler-' + code;
-        const conn = peer.connect(targetId, { reliable: true });
-        state.multiplayer.conn = conn;
+        peer.on('open', () => {
+          if (statusText) statusText.innerText = "Finding room " + code + "...";
+          const targetId = 'jjs-brawler-' + code.toUpperCase();
+          const conn = peer.connect(targetId, { reliable: true });
+          state.multiplayer.conn = conn;
 
-        conn.on('open', () => {
-          hasOpened = true;
-          state.multiplayer.active = true;
-          state.multiplayer.isHost = false;
-          state.multiplayer.roomCode = code;
-          setupMultiplayerDataHandlers(conn);
-          openGameArena(true);
-          showHitBanner("CONNECTED TO HOST! FIGHT!");
-          if (joinBtn) joinBtn.disabled = false;
-        });
-
-        conn.on('close', () => {
-          state.multiplayer.active = false;
-          showHitBanner("RIVAL DISCONNECTED");
-        });
-
-        conn.on('error', (err) => {
-          if (statusText) statusText.innerText = "Connection lost or interrupted.";
-          if (joinBtn) joinBtn.disabled = false;
-        });
-
-        // 10-second connection timeout fallback
-        setTimeout(() => {
-          if (!hasOpened && state.menuOpen) {
-            if (statusText) statusText.innerText = "Connection timed out. Host must be waiting in lobby.";
+          const onConnected = () => {
+            hasOpened = true;
+            state.multiplayer.active = true;
+            state.multiplayer.isHost = false;
+            state.multiplayer.roomCode = code;
+            setupMultiplayerDataHandlers(conn);
+            openGameArena(true);
+            showHitBanner("CONNECTED TO HOST! FIGHT!");
             if (joinBtn) joinBtn.disabled = false;
-          }
-        }, 10000);
-      });
+          };
 
-      peer.on('error', (err) => {
+          if (conn.open) {
+            onConnected();
+          } else {
+            conn.on('open', onConnected);
+          }
+
+          conn.on('close', () => {
+            state.multiplayer.active = false;
+            showHitBanner("RIVAL DISCONNECTED");
+          });
+
+          conn.on('error', (err) => {
+            if (statusText) statusText.innerText = "Connection lost or interrupted.";
+            if (joinBtn) joinBtn.disabled = false;
+          });
+
+          // 10-second connection timeout fallback
+          setTimeout(() => {
+            if (!hasOpened && state.menuOpen) {
+              if (statusText) statusText.innerText = "Connection timed out. Host must be waiting in lobby.";
+              if (joinBtn) joinBtn.disabled = false;
+            }
+          }, 10000);
+        });
+
+        peer.on('error', (err) => {
+          if (joinBtn) joinBtn.disabled = false;
+          if (err.type === 'peer-unavailable') {
+            if (statusText) statusText.innerText = "Room not found! Verify code (host must be waiting in lobby).";
+          } else {
+            if (statusText) statusText.innerText = "Error: " + (err.type || 'Connection failed') + ".";
+          }
+        });
+      } catch (err) {
+        console.warn("PeerJS join caught:", err);
         if (joinBtn) joinBtn.disabled = false;
-        if (err.type === 'peer-unavailable') {
-          if (statusText) statusText.innerText = "Room not found! Verify code (host must be waiting in lobby).";
-        } else {
-          if (statusText) statusText.innerText = "Error: " + (err.type || 'Connection failed') + ". Check network.";
+        if (statusText) {
+          statusText.innerHTML = "<span class='text-amber-400'>Canvas preview blocks WebSockets.</span><br><span class='text-[10px] text-gray-300'>Multiplayer runs live on your GitHub Pages site!</span>";
         }
-      });
+      }
     });
 
-    function setupMultiplayerDataHandlers(conn) {
-      conn.on('data', (data) => {
-        if (!data) return;
-
-        if (data.type === 'SYNC') {
-          dummy.root.position.set(data.x, data.y, data.z);
-          dummy.root.rotation.y = data.rotY;
-          state.dummy.hp = data.hp;
-          state.dummy.isBlocking = data.isBlocking;
-          state.dummy.state = data.state;
-          updateEnemyUI();
-        } else if (data.type === 'DAMAGE_APPLIED') {
-          state.player.hp = Math.max(0, state.player.hp - data.dmg);
-          updatePlayerUI();
-          triggerScreenShake(0.4);
-          if (state.player.hp <= 0) triggerPlayerDeath();
-        } else if (data.type === 'PLAYER_DEATH') {
-          state.dummy.hp = 0;
-          state.dummy.isDead = true;
-          updateEnemyUI();
-          showHitBanner("RIVAL DEFEATED!");
-        } else if (data.type === 'MOVE_ACTION') {
-          if (data.move === 'M1') playPunchSound(data.step === 4);
-          if (data.move === 'DASH') playDodgeSound();
-          if (data.move === 'SKILL_4') playBlackFlashSound(1);
-        }
-      });
-    }
-
-    function broadcastMultiplayer(payload) {
-      if (!state.multiplayer.active || !state.multiplayer.conn || !state.multiplayer.conn.open) return;
+    // Check URL parameters for direct link join
+    function checkUrlRoomCode() {
       try {
-        state.multiplayer.conn.send(payload);
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlRoom = urlParams.get('room');
+        if (urlRoom && urlRoom.length >= 4) {
+          const input = document.getElementById('input-room-code');
+          if (input) input.value = urlRoom.toUpperCase();
+          if (menuPrimary) menuPrimary.classList.add('hidden');
+          if (menuJoinBox) menuJoinBox.classList.remove('hidden');
+          const statusText = document.getElementById('join-status-text');
+          if (statusText) statusText.innerText = "Room code loaded from link. Click CONNECT!";
+        }
       } catch (e) {}
     }
 
@@ -3813,11 +3983,18 @@
         state.player.rotY += diff * 0.45;
       }
 
+      // Frame-rate independent locomotion physics (identical speed on PC 60/144/240Hz and Mobile)
+      const frictionFactor = Math.exp(-9.0 * dt);
+      state.player.vel.x *= frictionFactor;
+      state.player.vel.z *= frictionFactor;
+
       if (!state.player.isDead && state.player.state === 'IDLE' && moveDir.lengthSq() > 0.01) {
-        const guardMultiplier = state.player.isBlocking ? 0.42 : 1.0;
-        const speed = state.player.speed * guardMultiplier * (state.player.inZone ? 1.35 : 1.0);
-        state.player.vel.x += moveDir.x * speed * dt * 10;
-        state.player.vel.z += moveDir.z * speed * dt * 10;
+        const guardMultiplier = state.player.isBlocking ? 0.38 : 1.0;
+        const targetTopSpeed = state.player.speed * guardMultiplier * (state.player.inZone ? 1.35 : 1.0);
+        // Acceleration rate balanced to reach targetTopSpeed consistently at any frame rate
+        const accelRate = targetTopSpeed * 9.0;
+        state.player.vel.x += moveDir.x * accelRate * dt;
+        state.player.vel.z += moveDir.z * accelRate * dt;
 
         if (!state.shiftLock) {
           const targetRot = Math.atan2(moveDir.x, moveDir.z);
@@ -3828,9 +4005,12 @@
         }
       }
 
-      state.player.vel.x *= 0.82;
-      state.player.vel.z *= 0.82;
-      state.player.vel.y -= 22 * dt;
+      if (state.player.gravityFloatTimer > 0) {
+        state.player.gravityFloatTimer -= dt;
+        state.player.vel.y = -1.2;
+      } else {
+        state.player.vel.y -= 22 * dt;
+      }
       yuji.root.position.addScaledVector(state.player.vel, dt);
 
       const playerTerrainY = getTerrainHeight(yuji.root.position.x, yuji.root.position.z);
@@ -3867,13 +4047,14 @@
         });
       }
 
+      // Frame-rate independent dummy physics
       if (state.dummy.isSuperLaunching) {
-        state.dummy.vel.x *= 0.995;
-        state.dummy.vel.z *= 0.995;
+        state.dummy.vel.x *= Math.exp(-0.4 * dt);
+        state.dummy.vel.z *= Math.exp(-0.4 * dt);
         state.dummy.vel.y -= 12 * dt;
       } else {
-        state.dummy.vel.x *= 0.88;
-        state.dummy.vel.z *= 0.88;
+        state.dummy.vel.x *= Math.exp(-8.0 * dt);
+        state.dummy.vel.z *= Math.exp(-8.0 * dt);
         state.dummy.vel.y -= 25 * dt;
       }
       dummy.root.position.addScaledVector(state.dummy.vel, dt);
@@ -3912,8 +4093,29 @@
       dummy.leftKnee.rotation.set(0, 0, 0);
       dummy.rightKnee.rotation.set(0, 0, 0);
       dummy.pelvis.position.y = 1.6;
+      dummy.head.position.set(0, 0.33, 0);
+      dummy.head.rotation.set(0, 0, 0);
 
-      if (state.dummy.isDead && !state.dummy.isSuperLaunching) {
+      if (state.dummy.isHeadInGround) {
+        // True inverted handstand: head planted straight down in the sand, torso and legs up in the air
+        dummy.pelvis.position.y = 1.42;
+        dummy.pelvis.rotation.set(Math.PI, 0, 0);
+        dummy.torso.rotation.set(0, 0, 0);
+        dummy.head.position.set(0, 0.33, 0);
+        dummy.head.rotation.set(0, 0, 0);
+
+        // Legs extending straight up in the air like a handstand
+        dummy.leftLegPivot.rotation.set(0.08, 0, 0.22);
+        dummy.rightLegPivot.rotation.set(-0.08, 0, -0.22);
+        dummy.leftKnee.rotation.set(-0.2, 0, 0);
+        dummy.rightKnee.rotation.set(-0.15, 0, 0);
+
+        // Arms planted on the ground on either side
+        dummy.leftArmPivot.rotation.set(Math.PI - 0.25, 0.15, -0.65);
+        dummy.rightArmPivot.rotation.set(Math.PI - 0.25, -0.15, 0.65);
+        dummy.leftElbow.rotation.set(0.5, 0, 0);
+        dummy.rightElbow.rotation.set(0.5, 0, 0);
+      } else if (state.dummy.isDead && !state.dummy.isSuperLaunching) {
         dummy.pelvis.position.y = 0.22;
         dummy.pelvis.rotation.x = -Math.PI / 2;
         dummy.torso.rotation.set(0, 0, 0);
@@ -3932,18 +4134,6 @@
         dummy.rightElbow.rotation.x = -0.2;
         dummy.leftLegPivot.rotation.x = -0.3;
         dummy.rightLegPivot.rotation.x = 0.4;
-      } else if (state.dummy.isHeadInGround) {
-        dummy.pelvis.position.y = 1.35;
-        dummy.pelvis.rotation.set(0, 0, 0);
-        dummy.torso.rotation.set(Math.PI, 0, 0);
-        dummy.head.position.y = -0.4;
-        dummy.head.rotation.set(0, 0, 0);
-        dummy.leftLegPivot.rotation.set(-0.35, 0, 0.25);
-        dummy.rightLegPivot.rotation.set(-0.4, 0, -0.25);
-        dummy.leftKnee.rotation.set(-0.3, 0, 0);
-        dummy.rightKnee.rotation.set(-0.3, 0, 0);
-        dummy.leftArmPivot.rotation.set(-Math.PI * 0.9, 0, 0.35);
-        dummy.rightArmPivot.rotation.set(-Math.PI * 0.9, 0, -0.35);
       } else if (state.dummy.state === 'RAGDOLL') {
         dummy.pelvis.position.y = 0.22;
         dummy.pelvis.rotation.x = -Math.PI / 2;
@@ -4453,8 +4643,27 @@
       setTimeout(handleResize, 300);
     });
 
+    window.addEventListener('beforeunload', () => {
+      if (state.multiplayer.conn) {
+        try { state.multiplayer.conn.close(); } catch (e) {}
+      }
+      if (state.multiplayer.peer) {
+        try { state.multiplayer.peer.destroy(); } catch (e) {}
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
+      if (state.multiplayer.conn) {
+        try { state.multiplayer.conn.close(); } catch (e) {}
+      }
+      if (state.multiplayer.peer) {
+        try { state.multiplayer.peer.destroy(); } catch (e) {}
+      }
+    });
+
     window.onload = function() {
       handleResize();
+      checkUrlRoomCode();
       updateHotbarLabels();
       updatePlayerUI();
       updateEnemyUI();
