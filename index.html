@@ -241,15 +241,15 @@
         </div>
         <div class="flex items-center gap-2 text-xs text-gray-400">
           <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-          <span>Waiting for rival to connect via GitHub Pages...</span>
+          <span id="host-status-text">Registering room on network...</span>
         </div>
         <button id="btn-host-cancel" class="text-xs text-gray-500 hover:text-gray-300 underline mt-1">CANCEL</button>
       </div>
 
       <!-- Join Room Box -->
       <div id="menu-join-box" class="w-full flex-col items-center gap-3 bg-gray-950/80 p-4 rounded-xl border border-amber-800/40 hidden">
-        <span class="text-xs text-amber-400 font-bold uppercase tracking-wider">ENTER 4-DIGIT ROOM CODE</span>
-        <input id="input-room-code" type="text" maxlength="6" placeholder="e.g. 8421" class="w-48 bg-gray-900 border border-amber-500/60 rounded-lg py-2 px-3 text-center text-xl jjs-font text-white tracking-widest placeholder-gray-600 focus:outline-none focus:border-amber-400">
+        <span class="text-xs text-amber-400 font-bold uppercase tracking-wider">ENTER 4-CHARACTER ROOM CODE</span>
+        <input id="input-room-code" type="text" maxlength="6" placeholder="e.g. K72A" class="w-48 bg-gray-900 border border-amber-500/60 rounded-lg py-2 px-3 text-center text-xl jjs-font text-white uppercase tracking-widest placeholder-gray-600 focus:outline-none focus:border-amber-400">
         <div class="flex gap-2 w-full">
           <button id="btn-join-submit" class="flex-1 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-black font-black combat-font text-base tracking-wider uppercase transition active:scale-95 shadow">CONNECT</button>
           <button id="btn-join-cancel" class="px-3 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-xs font-bold transition">BACK</button>
@@ -3249,6 +3249,29 @@
     const menuHostBox = document.getElementById('menu-host-box');
     const menuJoinBox = document.getElementById('menu-join-box');
 
+    // Public STUN servers to enable cross-network NAT traversal for GitHub Pages
+    const PEER_CONFIG = {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    };
+
+    function generateRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
     function openGameArena(isMultiplayer = false) {
       state.menuOpen = false;
       if (menuOverlay) {
@@ -3281,7 +3304,11 @@
       if (menuJoinBox) menuJoinBox.classList.add('hidden');
 
       if (state.multiplayer.conn) {
-        state.multiplayer.conn.close();
+        try { state.multiplayer.conn.close(); } catch (e) {}
+      }
+      if (state.multiplayer.peer) {
+        try { state.multiplayer.peer.destroy(); } catch (e) {}
+        state.multiplayer.peer = null;
       }
       state.multiplayer.active = false;
       showHitBanner("RETURNED TO LOBBY");
@@ -3295,40 +3322,70 @@
       showHitBanner("SOLO PRACTICE STARTED");
     });
 
-    document.getElementById('btn-menu-create').addEventListener('click', () => {
-      if (menuPrimary) menuPrimary.classList.add('hidden');
-      if (menuHostBox) menuHostBox.classList.remove('hidden');
-
-      const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
-      state.multiplayer.roomCode = randomCode;
+    function createHostPeer() {
+      const code = generateRoomCode();
+      state.multiplayer.roomCode = code;
       state.multiplayer.isHost = true;
 
       const codeDisplay = document.getElementById('room-code-display');
-      if (codeDisplay) codeDisplay.innerText = randomCode;
+      const hostStatusText = document.getElementById('host-status-text');
+      if (codeDisplay) codeDisplay.innerText = '...';
+      if (hostStatusText) hostStatusText.innerText = 'Registering room on network...';
 
-      try {
-        const peerId = 'jjs-room-' + randomCode;
-        if (state.multiplayer.peer) state.multiplayer.peer.destroy();
-        state.multiplayer.peer = new Peer(peerId);
+      if (state.multiplayer.peer) {
+        try { state.multiplayer.peer.destroy(); } catch (e) {}
+        state.multiplayer.peer = null;
+      }
 
-        state.multiplayer.peer.on('connection', (conn) => {
-          state.multiplayer.conn = conn;
+      const peerId = 'jjs-brawler-' + code;
+      const peer = new Peer(peerId, PEER_CONFIG);
+      state.multiplayer.peer = peer;
+
+      peer.on('open', (id) => {
+        if (codeDisplay) codeDisplay.innerText = code;
+        if (hostStatusText) hostStatusText.innerText = 'Room active! Waiting for friend to join...';
+      });
+
+      peer.on('connection', (conn) => {
+        if (hostStatusText) hostStatusText.innerText = 'Rival connecting...';
+        state.multiplayer.conn = conn;
+
+        conn.on('open', () => {
           state.multiplayer.active = true;
           setupMultiplayerDataHandlers(conn);
           openGameArena(true);
           showHitBanner("RIVAL CONNECTED! BATTLE START!");
         });
 
-        state.multiplayer.peer.on('error', (err) => {
-          console.warn("PeerJS host notice:", err);
+        conn.on('error', (err) => {
+          if (hostStatusText) hostStatusText.innerText = 'Connection error with peer. Still waiting...';
         });
-      } catch (err) {
-        console.warn("PeerJS setup error:", err);
-      }
+
+        conn.on('close', () => {
+          state.multiplayer.active = false;
+          showHitBanner("RIVAL DISCONNECTED");
+        });
+      });
+
+      peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+          // If code collision occurs on public broker, auto-retry with fresh code
+          createHostPeer();
+        } else {
+          if (hostStatusText) hostStatusText.innerText = 'Network notice: ' + (err.type || 'Connection issue') + '. Retrying...';
+        }
+      });
+    }
+
+    document.getElementById('btn-menu-create').addEventListener('click', () => {
+      if (menuPrimary) menuPrimary.classList.add('hidden');
+      if (menuHostBox) menuHostBox.classList.remove('hidden');
+      createHostPeer();
     });
 
     document.getElementById('btn-copy-code').addEventListener('click', () => {
       const code = state.multiplayer.roomCode;
+      if (!code || code === '...') return;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(code).catch(() => {});
       }
@@ -3340,7 +3397,10 @@
     });
 
     document.getElementById('btn-host-cancel').addEventListener('click', () => {
-      if (state.multiplayer.peer) state.multiplayer.peer.destroy();
+      if (state.multiplayer.peer) {
+        try { state.multiplayer.peer.destroy(); } catch (e) {}
+        state.multiplayer.peer = null;
+      }
       if (menuHostBox) menuHostBox.classList.add('hidden');
       if (menuPrimary) menuPrimary.classList.remove('hidden');
     });
@@ -3349,6 +3409,8 @@
       if (menuPrimary) menuPrimary.classList.add('hidden');
       if (menuJoinBox) menuJoinBox.classList.remove('hidden');
       const input = document.getElementById('input-room-code');
+      const statusText = document.getElementById('join-status-text');
+      if (statusText) statusText.innerText = "Enter code provided by the host";
       if (input) {
         input.value = '';
         input.focus();
@@ -3356,50 +3418,82 @@
     });
 
     document.getElementById('btn-join-cancel').addEventListener('click', () => {
+      if (state.multiplayer.peer) {
+        try { state.multiplayer.peer.destroy(); } catch (e) {}
+        state.multiplayer.peer = null;
+      }
       if (menuJoinBox) menuJoinBox.classList.add('hidden');
       if (menuPrimary) menuPrimary.classList.remove('hidden');
     });
 
     document.getElementById('btn-join-submit').addEventListener('click', () => {
       const input = document.getElementById('input-room-code');
-      const code = input ? input.value.trim() : '';
+      const rawCode = input ? input.value : '';
+      const code = rawCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
       const statusText = document.getElementById('join-status-text');
+      const joinBtn = document.getElementById('btn-join-submit');
 
       if (!code || code.length < 4) {
-        if (statusText) statusText.innerText = "Please enter a valid 4-digit code!";
+        if (statusText) statusText.innerText = "Please enter a valid 4-character code!";
         return;
       }
 
-      if (statusText) statusText.innerText = "Connecting to room " + code + "...";
+      if (statusText) statusText.innerText = "Connecting to server...";
+      if (joinBtn) joinBtn.disabled = true;
 
-      try {
-        if (state.multiplayer.peer) state.multiplayer.peer.destroy();
-        state.multiplayer.peer = new Peer();
-
-        state.multiplayer.peer.on('open', () => {
-          const targetId = 'jjs-room-' + code;
-          const conn = state.multiplayer.peer.connect(targetId);
-
-          conn.on('open', () => {
-            state.multiplayer.conn = conn;
-            state.multiplayer.active = true;
-            state.multiplayer.isHost = false;
-            setupMultiplayerDataHandlers(conn);
-            openGameArena(true);
-            showHitBanner("CONNECTED TO HOST! FIGHT!");
-          });
-
-          conn.on('error', (e) => {
-            if (statusText) statusText.innerText = "Failed to connect! Check room code.";
-          });
-        });
-
-        state.multiplayer.peer.on('error', (err) => {
-          if (statusText) statusText.innerText = "Connection error: Check code or host status.";
-        });
-      } catch (err) {
-        if (statusText) statusText.innerText = "WebRTC peer connection error.";
+      if (state.multiplayer.peer) {
+        try { state.multiplayer.peer.destroy(); } catch (e) {}
+        state.multiplayer.peer = null;
       }
+
+      const peer = new Peer(PEER_CONFIG);
+      state.multiplayer.peer = peer;
+      let hasOpened = false;
+
+      peer.on('open', () => {
+        if (statusText) statusText.innerText = "Finding room " + code + "...";
+        const targetId = 'jjs-brawler-' + code;
+        const conn = peer.connect(targetId, { reliable: true });
+        state.multiplayer.conn = conn;
+
+        conn.on('open', () => {
+          hasOpened = true;
+          state.multiplayer.active = true;
+          state.multiplayer.isHost = false;
+          state.multiplayer.roomCode = code;
+          setupMultiplayerDataHandlers(conn);
+          openGameArena(true);
+          showHitBanner("CONNECTED TO HOST! FIGHT!");
+          if (joinBtn) joinBtn.disabled = false;
+        });
+
+        conn.on('close', () => {
+          state.multiplayer.active = false;
+          showHitBanner("RIVAL DISCONNECTED");
+        });
+
+        conn.on('error', (err) => {
+          if (statusText) statusText.innerText = "Connection lost or interrupted.";
+          if (joinBtn) joinBtn.disabled = false;
+        });
+
+        // 10-second connection timeout fallback
+        setTimeout(() => {
+          if (!hasOpened && state.menuOpen) {
+            if (statusText) statusText.innerText = "Connection timed out. Host must be waiting in lobby.";
+            if (joinBtn) joinBtn.disabled = false;
+          }
+        }, 10000);
+      });
+
+      peer.on('error', (err) => {
+        if (joinBtn) joinBtn.disabled = false;
+        if (err.type === 'peer-unavailable') {
+          if (statusText) statusText.innerText = "Room not found! Verify code (host must be waiting in lobby).";
+        } else {
+          if (statusText) statusText.innerText = "Error: " + (err.type || 'Connection failed') + ". Check network.";
+        }
+      });
     });
 
     function setupMultiplayerDataHandlers(conn) {
@@ -3426,17 +3520,13 @@
         } else if (data.type === 'MOVE_ACTION') {
           if (data.move === 'M1') playPunchSound(data.step === 4);
           if (data.move === 'DASH') playDodgeSound();
+          if (data.move === 'SKILL_4') playBlackFlashSound(1);
         }
-      });
-
-      conn.on('close', () => {
-        state.multiplayer.active = false;
-        showHitBanner("RIVAL DISCONNECTED");
       });
     }
 
     function broadcastMultiplayer(payload) {
-      if (!state.multiplayer.active || !state.multiplayer.conn) return;
+      if (!state.multiplayer.active || !state.multiplayer.conn || !state.multiplayer.conn.open) return;
       try {
         state.multiplayer.conn.send(payload);
       } catch (e) {}
