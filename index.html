@@ -4136,6 +4136,20 @@
         dummy.root.rotation.y += dRotDiff * Math.min(1.0, 18.0 * dt);
         state.dummy.rotY = dummy.root.rotation.y;
 
+        // Countdown stun and attack timers for the remote player so they recover smoothly
+        if (state.dummy.stunTimer > 0) {
+          state.dummy.stunTimer -= dt;
+          if (state.dummy.stunTimer <= 0) {
+            updateEnemyUI();
+          }
+        }
+        if (state.dummy.ragdollTimer > 0) {
+          state.dummy.ragdollTimer -= dt;
+          if (state.dummy.ragdollTimer <= 0 && (state.dummy.state === 'RAGDOLL' || state.dummy.state === 'LAUNCHED_BACK')) {
+            state.dummy.state = 'IDLE';
+            updateEnemyUI();
+          }
+        }
         if (state.dummy.attackTimer > 0) {
           state.dummy.attackTimer -= dt;
           if (state.dummy.attackTimer <= 0 && state.dummy.state === 'ATTACKING') {
