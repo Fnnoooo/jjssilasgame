@@ -4111,7 +4111,8 @@
       // Smooth position interpolation in multiplayer vs local AI physics
       if (state.multiplayer.active) {
         // Dead reckoning extrapolation with smooth lerp
-        const predictedPos = state.multiplayer.targetDummyPos.clone().addScaledVector(state.multiplayer.targetDummyVel, dt * 0.4);
+        const dummyVel = state.multiplayer.targetDummyVel || new THREE.Vector3(0, 0, 0);
+        const predictedPos = state.multiplayer.targetDummyPos.clone().addScaledVector(dummyVel, dt * 0.4);
         const lerpFactor = Math.min(1.0, 16.0 * dt);
         dummy.root.position.lerp(predictedPos, lerpFactor);
 
@@ -4121,9 +4122,9 @@
         dummy.root.rotation.y += dRotDiff * Math.min(1.0, 18.0 * dt);
         state.dummy.rotY = dummy.root.rotation.y;
 
-        if (state.dummy.actionTimer > 0) {
-          state.dummy.actionTimer -= dt;
-          if (state.dummy.actionTimer <= 0 && state.dummy.state === 'ATTACKING') {
+        if (state.dummy.attackTimer > 0) {
+          state.dummy.attackTimer -= dt;
+          if (state.dummy.attackTimer <= 0 && state.dummy.state === 'ATTACKING') {
             state.dummy.state = 'IDLE';
             state.dummy.currentMove = null;
           }
