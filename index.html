@@ -1610,6 +1610,17 @@
     dummy.root.position.set(0, 0, -6);
     scene.add(dummy.root);
 
+    // Floating Overhead Locator Beacon for Rival in Multiplayer
+    const rivalBeaconGroup = new THREE.Group();
+    rivalBeaconGroup.position.y = 3.3;
+    const beaconGeo = new THREE.ConeGeometry(0.28, 0.55, 4);
+    beaconGeo.rotateX(Math.PI); // Point down towards rival's head
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    const beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+    rivalBeaconGroup.add(beaconMesh);
+    rivalBeaconGroup.visible = false;
+    dummy.root.add(rivalBeaconGroup);
+
     const lightningGroup = new THREE.Group();
     scene.add(lightningGroup);
 
@@ -1789,7 +1800,9 @@
         peer: null,
         conn: null,
         roomCode: '',
-        lastBroadcast: 0
+        lastBroadcast: 0,
+        targetDummyPos: new THREE.Vector3(0, 0, -6),
+        targetDummyRotY: 0
       },
       player: {
         hp: 100,
@@ -3315,17 +3328,21 @@
         if (!data || typeof data !== 'object') return;
 
         if (data.type === 'SYNC') {
-          dummy.root.position.set(data.x, data.y, data.z);
-          dummy.root.rotation.y = data.rotY;
+          state.multiplayer.targetDummyPos.set(data.x, data.y, data.z);
+          state.multiplayer.targetDummyRotY = data.rotY;
           state.dummy.rotY = data.rotY;
           state.dummy.hp = data.hp;
           state.dummy.isBlocking = !!data.isBlocking;
+          state.dummy.isMoving = !!data.isMoving;
           if (data.state) state.dummy.state = data.state;
+          if (data.currentMove) state.dummy.currentMove = data.currentMove;
+          if (data.m1Step) state.dummy.attackPhase = data.m1Step;
           updateEnemyUI();
         } else if (data.type === 'MOVE_ACTION') {
           if (data.move === 'M1') {
             playPunchSound(data.step === 4);
             state.dummy.state = 'ATTACKING';
+            state.dummy.attackPhase = data.step || 1;
             state.dummy.attackDuration = 0.32;
             state.dummy.attackTimer = 0.32;
           } else if (data.move === 'SKILL_1') {
@@ -3422,10 +3439,60 @@
       if (dummyBtn) {
         dummyBtn.style.display = isMultiplayer ? 'none' : 'flex';
       }
+
+      if (isMultiplayer) {
+        rivalBeaconGroup.visible = true;
+        // Position players opposite each other facing one another
+        if (state.multiplayer.isHost) {
+          // Host spawns at (0, 0, 11) facing North (-Z)
+          yuji.root.position.set(0, getTerrainHeight(0, 11), 11);
+          state.player.rotY = 0;
+          state.camera.yaw = 0;
+
+          // Rival dummy initialized across the arena at (0, 0, -11) facing South (+Z)
+          dummy.root.position.set(0, getTerrainHeight(0, -11), -11);
+          state.multiplayer.targetDummyPos.set(0, getTerrainHeight(0, -11), -11);
+          state.multiplayer.targetDummyRotY = Math.PI;
+          dummy.root.rotation.y = Math.PI;
+          state.dummy.rotY = Math.PI;
+        } else {
+          // Guest spawns at (0, 0, -11) facing South (+Z)
+          yuji.root.position.set(0, getTerrainHeight(0, -11), -11);
+          state.player.rotY = Math.PI;
+          state.camera.yaw = Math.PI;
+
+          // Rival dummy initialized across the arena at (0, 0, 11) facing North (-Z)
+          dummy.root.position.set(0, getTerrainHeight(0, 11), 11);
+          state.multiplayer.targetDummyPos.set(0, getTerrainHeight(0, 11), 11);
+          state.multiplayer.targetDummyRotY = 0;
+          dummy.root.rotation.y = 0;
+          state.dummy.rotY = 0;
+        }
+
+        // Full reset of both characters' states and postures
+        state.player.hp = 100;
+        state.player.isDead = false;
+        state.player.state = 'IDLE';
+        state.dummy.hp = 100;
+        state.dummy.isDead = false;
+        state.dummy.state = 'IDLE';
+        state.dummy.isHeadInGround = false;
+        state.dummy.isSuperLaunching = false;
+
+        yuji.pelvis.position.y = 1.6;
+        yuji.pelvis.rotation.set(0, 0, 0);
+        dummy.pelvis.position.y = 1.6;
+        dummy.pelvis.rotation.set(0, 0, 0);
+        updatePlayerUI();
+        updateEnemyUI();
+      } else {
+        rivalBeaconGroup.visible = false;
+      }
     }
 
     function returnToMenu() {
       state.menuOpen = true;
+      rivalBeaconGroup.visible = false;
       if (menuOverlay) {
         menuOverlay.style.display = 'flex';
         setTimeout(() => {
@@ -3740,24 +3807,24 @@
         }
       }
     });
-
-    function handleJoystickMove(clientX, clientY) {
-      const dx = clientX - joystickCenter.x;
-      const dy = clientY - joystickCenter.y;
-      const maxRadius = 24;
-      const dist = Math.hypot(dx, dy);
-      const angle = Math.atan2(dy, dx);
-      const clampedDist = Math.min(dist, maxRadius);
-
-      const kx = Math.cos(angle) * clampedDist;
-      const ky = Math.sin(angle) * clampedDist;
-      knob.style.transform = `translate(${kx}px, ${ky}px)`;
-
-      joystickVector = {
-        x: kx / maxRadius,
-        y: ky / maxRadius
-      };
-    }
+    // High-frequency multiplayer sync loop (30Hz tick, runs even when tab is backgrounded)
+    setInterval(() => {
+      if (!state.multiplayer.active || !state.multiplayer.conn || !state.multiplayer.conn.open) return;
+      const isMoving = state.player.vel.lengthSq() > 0.4;
+      broadcastMultiplayer({
+        type: 'SYNC',
+        x: yuji.root.position.x,
+        y: yuji.root.position.y,
+        z: yuji.root.position.z,
+        rotY: state.player.rotY,
+        hp: state.player.hp,
+        isBlocking: state.player.isBlocking,
+        isMoving: isMoving,
+        state: state.player.state,
+        currentMove: state.player.currentMove,
+        m1Step: state.player.m1Step
+      });
+    }, 33);
 
     const clock = new THREE.Clock();
 
@@ -4032,55 +4099,56 @@
       }
       yuji.root.rotation.y = state.player.rotY;
 
-      // Broadcast position to peer in multiplayer
-      if (state.multiplayer.active && time - state.multiplayer.lastBroadcast > 0.033) {
-        state.multiplayer.lastBroadcast = time;
-        broadcastMultiplayer({
-          type: 'SYNC',
-          x: yuji.root.position.x,
-          y: yuji.root.position.y,
-          z: yuji.root.position.z,
-          rotY: state.player.rotY,
-          hp: state.player.hp,
-          isBlocking: state.player.isBlocking,
-          state: state.player.state
-        });
+      // Animate overhead rival locator beacon
+      if (rivalBeaconGroup.visible) {
+        beaconMesh.rotation.y += dt * 3.5;
+        rivalBeaconGroup.position.y = 3.3 + Math.sin(time * 5.0) * 0.15;
       }
 
-      // Frame-rate independent dummy physics
-      if (state.dummy.isSuperLaunching) {
-        state.dummy.vel.x *= Math.exp(-0.4 * dt);
-        state.dummy.vel.z *= Math.exp(-0.4 * dt);
-        state.dummy.vel.y -= 12 * dt;
+      // Smooth position interpolation in multiplayer vs local AI physics
+      if (state.multiplayer.active) {
+        dummy.root.position.lerp(state.multiplayer.targetDummyPos, 0.4);
+        let dRotDiff = state.multiplayer.targetDummyRotY - dummy.root.rotation.y;
+        while (dRotDiff < -Math.PI) dRotDiff += Math.PI * 2;
+        while (dRotDiff > Math.PI) dRotDiff -= Math.PI * 2;
+        dummy.root.rotation.y += dRotDiff * 0.35;
+        state.dummy.rotY = dummy.root.rotation.y;
       } else {
-        state.dummy.vel.x *= Math.exp(-8.0 * dt);
-        state.dummy.vel.z *= Math.exp(-8.0 * dt);
-        state.dummy.vel.y -= 25 * dt;
-      }
-      dummy.root.position.addScaledVector(state.dummy.vel, dt);
-
-      const dummyTerrainY = getTerrainHeight(dummy.root.position.x, dummy.root.position.z);
-      if (dummy.root.position.y <= dummyTerrainY && !state.dummy.isSuperLaunching) {
-        dummy.root.position.y = dummyTerrainY;
-        state.dummy.vel.y = 0;
-      }
-
-      const dDist = Math.hypot(dummy.root.position.x, dummy.root.position.z);
-      if (dDist > beachLimit && !state.dummy.isSuperLaunching && state.dummy.state !== 'LAUNCHED_BACK') {
-        const dAngle = Math.atan2(dummy.root.position.z, dummy.root.position.x);
-        dummy.root.position.x = Math.cos(dAngle) * beachLimit;
-        dummy.root.position.z = Math.sin(dAngle) * beachLimit;
-        if (state.dummy.vel.length() > 12) {
-          playPunchSound(true);
-          triggerScreenShake(0.42);
-          spawnDebris(dummy.root.position, 16);
-          showHitBanner("SHORELINE IMPACT!!");
-          state.dummy.vel.x *= -0.7;
-          state.dummy.vel.z *= -0.7;
+        // Frame-rate independent dummy physics for solo practice AI
+        if (state.dummy.isSuperLaunching) {
+          state.dummy.vel.x *= Math.exp(-0.4 * dt);
+          state.dummy.vel.z *= Math.exp(-0.4 * dt);
+          state.dummy.vel.y -= 12 * dt;
+        } else {
+          state.dummy.vel.x *= Math.exp(-8.0 * dt);
+          state.dummy.vel.z *= Math.exp(-8.0 * dt);
+          state.dummy.vel.y -= 25 * dt;
         }
-      }
+        dummy.root.position.addScaledVector(state.dummy.vel, dt);
 
-      updateDummyAI(dt);
+        const dummyTerrainY = getTerrainHeight(dummy.root.position.x, dummy.root.position.z);
+        if (dummy.root.position.y <= dummyTerrainY && !state.dummy.isSuperLaunching) {
+          dummy.root.position.y = dummyTerrainY;
+          state.dummy.vel.y = 0;
+        }
+
+        const dDist = Math.hypot(dummy.root.position.x, dummy.root.position.z);
+        if (dDist > beachLimit && !state.dummy.isSuperLaunching && state.dummy.state !== 'LAUNCHED_BACK') {
+          const dAngle = Math.atan2(dummy.root.position.z, dummy.root.position.x);
+          dummy.root.position.x = Math.cos(dAngle) * beachLimit;
+          dummy.root.position.z = Math.sin(dAngle) * beachLimit;
+          if (state.dummy.vel.length() > 12) {
+            playPunchSound(true);
+            triggerScreenShake(0.42);
+            spawnDebris(dummy.root.position, 16);
+            showHitBanner("SHORELINE IMPACT!!");
+            state.dummy.vel.x *= -0.7;
+            state.dummy.vel.z *= -0.7;
+          }
+        }
+
+        updateDummyAI(dt);
+      }
 
       dummy.torso.rotation.set(0, 0, 0);
       dummy.pelvis.rotation.set(0, 0, 0);
@@ -4097,20 +4165,17 @@
       dummy.head.rotation.set(0, 0, 0);
 
       if (state.dummy.isHeadInGround) {
-        // True inverted handstand: head planted straight down in the sand, torso and legs up in the air
         dummy.pelvis.position.y = 1.42;
         dummy.pelvis.rotation.set(Math.PI, 0, 0);
         dummy.torso.rotation.set(0, 0, 0);
         dummy.head.position.set(0, 0.33, 0);
         dummy.head.rotation.set(0, 0, 0);
 
-        // Legs extending straight up in the air like a handstand
         dummy.leftLegPivot.rotation.set(0.08, 0, 0.22);
         dummy.rightLegPivot.rotation.set(-0.08, 0, -0.22);
         dummy.leftKnee.rotation.set(-0.2, 0, 0);
         dummy.rightKnee.rotation.set(-0.15, 0, 0);
 
-        // Arms planted on the ground on either side
         dummy.leftArmPivot.rotation.set(Math.PI - 0.25, 0.15, -0.65);
         dummy.rightArmPivot.rotation.set(Math.PI - 0.25, -0.15, 0.65);
         dummy.leftElbow.rotation.set(0.5, 0, 0);
@@ -4178,8 +4243,8 @@
           dummy.torso.rotation.y = 0.5;
           dummy.torso.rotation.x = 0.25;
         }
-      } else if (state.dummy.vel.lengthSq() > 1.0) {
-        const dWalk = state.dummy.walkCycle;
+      } else if ((state.multiplayer.active && state.dummy.isMoving) || (!state.multiplayer.active && state.dummy.vel.lengthSq() > 1.0)) {
+        const dWalk = (state.multiplayer.active ? time * 14 : state.dummy.walkCycle);
         dummy.leftLegPivot.rotation.x = Math.sin(dWalk) * 0.75;
         dummy.rightLegPivot.rotation.x = -Math.sin(dWalk) * 0.75;
         dummy.leftKnee.rotation.x = Math.max(0, -Math.sin(dWalk) * 0.65);
