@@ -597,20 +597,26 @@
           if (ostRepeatId === null) {
             ostRepeatId = Tone.Transport.scheduleRepeat((time) => {
               if (!ostPlaying) return;
-              if (ostStep % 4 === 0 && ostKick) {
-                ostKick.triggerAttackRelease('C1', '8n', time, 0.95);
-              }
-              if (ostStep % 2 === 1 && ostHihat) {
-                ostHihat.triggerAttackRelease('16n', time, 0.45);
-              }
-              if (ostStep % 2 === 0 && ostBass) {
-                const bNote = bassNotes[(ostStep / 2) % bassNotes.length];
-                ostBass.triggerAttackRelease(bNote, '8n', time, 0.78);
-              }
-              if (ostLead) {
-                const lNote = leadArp[ostStep % leadArp.length];
-                ostLead.triggerAttackRelease(lNote, '16n', time, 0.32);
-              }
+              try {
+                // Ensure time is always strictly future-oriented relative to WebAudio clock
+                const now = Tone.now();
+                const schedTime = Math.max(time, now + 0.008);
+
+                if (ostStep % 4 === 0 && ostKick) {
+                  try { ostKick.triggerAttackRelease('C1', '8n', schedTime, 0.95); } catch (e) {}
+                }
+                if (ostStep % 2 === 1 && ostHihat) {
+                  try { ostHihat.triggerAttackRelease('16n', schedTime, 0.45); } catch (e) {}
+                }
+                if (ostStep % 2 === 0 && ostBass) {
+                  const bNote = bassNotes[(ostStep / 2) % bassNotes.length];
+                  try { ostBass.triggerAttackRelease(bNote, '8n', schedTime, 0.78); } catch (e) {}
+                }
+                if (ostLead) {
+                  const lNote = leadArp[ostStep % leadArp.length];
+                  try { ostLead.triggerAttackRelease(lNote, '16n', schedTime, 0.32); } catch (e) {}
+                }
+              } catch (err) {}
               ostStep = (ostStep + 1) % 16;
             }, '16n');
           }
@@ -631,7 +637,6 @@
           }
           ostStep = 0;
           ostPlaying = true;
-          Tone.Transport.seconds = 0;
           Tone.Transport.start();
         }
       } catch (e) {
@@ -644,8 +649,9 @@
         ostPlaying = false;
         if (window.Tone && Tone.Transport) {
           Tone.Transport.stop();
-          Tone.Transport.seconds = 0;
         }
+        if (ostBass && ostBass.triggerRelease) { try { ostBass.triggerRelease(); } catch(e){} }
+        if (ostLead && ostLead.triggerRelease) { try { ostLead.triggerRelease(); } catch(e){} }
       } catch (e) {}
     }
 
@@ -2175,8 +2181,12 @@
       if (subText) subText.innerText = "DIVERGENT HARMONY";
       if (titleBox) titleBox.style.opacity = '1';
 
-      if (cinematicDrone) cinematicDrone.triggerAttack('D1');
-      if (heartbeatSynth) heartbeatSynth.triggerAttackRelease('C1', '8n');
+      if (cinematicDrone) {
+        try { cinematicDrone.triggerAttack('D1'); } catch (e) {}
+      }
+      if (heartbeatSynth) {
+        try { heartbeatSynth.triggerAttackRelease('C1', '8n'); } catch (e) {}
+      }
       triggerScreenShake(0.35);
 
       broadcastMultiplayer({ type: 'AWAKEN_START' });
@@ -2185,6 +2195,10 @@
     function completeCinematicAwakening() {
       state.cinematic.active = false;
       state.cinematic.timer = 0;
+
+      if (cinematicDrone && cinematicDrone.triggerRelease) {
+        try { cinematicDrone.triggerRelease(); } catch (e) {}
+      }
 
       state.player.state = 'IDLE';
       state.player.inZone = true;
