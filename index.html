@@ -2271,11 +2271,13 @@
       const dot = victimFacing.dot(toAttacker);
       const isFromBehind = dot < -0.2;
 
+      let guardBroken = false;
       if (state.dummy.isBlocking && !isUnblockable) {
         if (isFromBehind) {
           state.dummy.isBlocking = false;
           state.dummy.state = 'BLOCK_BROKEN';
           state.dummy.stunTimer = 1.3;
+          guardBroken = true;
           spawnGlassBreak(dummy.root.position.clone().add(new THREE.Vector3(0, 1.4, 0)));
           triggerAnimeImpactFrame();
           triggerScreenShake(0.5);
@@ -2284,6 +2286,9 @@
           playPunchSound(false);
           triggerScreenShake(0.08);
           showHitBanner("BLOCKED! 0 DMG (0 ULT)");
+          broadcastMultiplayer({
+            type: 'HIT_BLOCKED'
+          });
           return false;
         }
       }
@@ -2343,12 +2348,21 @@
         triggerDummyDeath(hitType === 'BLACK_FLASH_LAUNCH' || hitType === 'BLACK_FLASH_STAGGER' || hitType === 'FAR_LAUNCH', hitType === 'SUPER_MEGA_LAUNCH');
       }
 
+      // Broadcast full authoritative hit reaction so the rival receives exact physics & animations
       broadcastMultiplayer({
         type: 'DAMAGE_APPLIED',
         dmg: dmg,
         hitType: hitType,
         isUnblockable: isUnblockable,
-        targetHp: state.dummy.hp
+        targetHp: state.dummy.hp,
+        guardBroken: guardBroken,
+        velX: state.dummy.vel.x,
+        velY: state.dummy.vel.y,
+        velZ: state.dummy.vel.z,
+        isHeadInGround: state.dummy.isHeadInGround,
+        isSuperLaunching: state.dummy.isSuperLaunching,
+        ragdollTimer: state.dummy.ragdollTimer,
+        stunTimer: state.dummy.stunTimer
       });
 
       return true;
@@ -3345,6 +3359,14 @@
             state.dummy.attackPhase = data.step || 1;
             state.dummy.attackDuration = 0.32;
             state.dummy.attackTimer = 0.32;
+          } else if (data.move === 'DOWNSLAM') {
+            playPunchSound(true);
+            state.dummy.state = 'ATTACKING';
+            state.dummy.currentMove = 'DOWNSLAM_FINISHER';
+            state.dummy.attackDuration = 0.5;
+            state.dummy.attackTimer = 0.5;
+            triggerScreenShake(0.7);
+            spawnDebris(dummy.root.position, 18);
           } else if (data.move === 'SKILL_1') {
             playPunchSound(false);
             state.dummy.state = 'ATTACKING';
@@ -3366,22 +3388,84 @@
           } else if (data.move === 'DASH' || data.move === 'JUMP') {
             playDodgeSound();
           }
+        } else if (data.type === 'HIT_BLOCKED') {
+          playPunchSound(false);
+          triggerScreenShake(0.1);
         } else if (data.type === 'DAMAGE_APPLIED') {
           if (!state.player.isDead) {
-            if (state.player.isBlocking && !data.isUnblockable) {
-              playPunchSound(false);
-              triggerScreenShake(0.1);
-            } else {
-              state.player.hp = Math.max(0, state.player.hp - data.dmg);
-              updatePlayerUI();
+            state.player.hp = Math.max(0, data.targetHp !== undefined ? data.targetHp : (state.player.hp - data.dmg));
+            updatePlayerUI();
+
+            // Symmetrically apply exact hit reactions on player's local character
+            if (data.guardBroken) {
+              state.player.isBlocking = false;
+              state.player.state = 'BLOCK_BROKEN';
+              state.player.stunTimer = 1.3;
+              spawnGlassBreak(yuji.root.position.clone().add(new THREE.Vector3(0, 1.4, 0)));
+              triggerAnimeImpactFrame();
+              triggerScreenShake(0.5);
+              showHitBanner("YOUR GUARD WAS SHATTERED FROM BEHIND!");
+            } else if (data.hitType === 'DOWN_SLAM') {
               playPunchSound(true);
+              triggerAnimeImpactFrame();
+              triggerScreenShake(0.7);
+              spawnDebris(yuji.root.position, 18);
+              state.player.isBlocking = false;
+              state.player.state = 'RAGDOLL';
+              state.player.ragdollTimer = 1.5;
+              state.player.stunTimer = 0;
+              state.player.vel.set(0, 0, 0);
+              const terrainY = getTerrainHeight(yuji.root.position.x, yuji.root.position.z);
+              yuji.root.position.y = terrainY;
+              yuji.pelvis.position.y = 0.22;
+              yuji.pelvis.rotation.set(-Math.PI / 2, 0, 0);
+              showHitBanner("SLAMMED DOWN INTO THE SAND!");
+            } else if (data.hitType === 'SUPER_MEGA_LAUNCH') {
+              playPunchSound(true);
+              triggerAnimeImpactFrame();
+              triggerScreenShake(0.85);
+              spawnDebris(yuji.root.position, 20);
+              state.player.isBlocking = false;
+              state.player.isSuperLaunching = true;
+              state.player.state = 'LAUNCHED_BACK';
+              state.player.ragdollTimer = 4.0;
+              if (data.velX !== undefined) {
+                state.player.vel.set(-data.velX, data.velY, -data.velZ);
+              }
+              showHitBanner("BLASTED TOWARDS THE HORIZON!");
+            } else if (data.hitType === 'DROPKICK_LAUNCH' || data.hitType === 'FAR_LAUNCH' || data.hitType === 'BLACK_FLASH_LAUNCH') {
+              playPunchSound(true);
+              triggerScreenShake(0.45);
+              spawnDebris(yuji.root.position, 12);
+              state.player.isBlocking = false;
+              state.player.state = 'RAGDOLL';
+              state.player.ragdollTimer = data.ragdollTimer || 1.4;
+              if (data.velX !== undefined) {
+                state.player.vel.set(-data.velX * 0.9, data.velY || 8, -data.velZ * 0.9);
+              }
+            } else if (data.isHeadInGround) {
+              playPunchSound(true);
+              triggerAnimeImpactFrame();
+              triggerScreenShake(0.9);
+              spawnDebris(yuji.root.position, 22);
+              state.player.isBlocking = false;
+              state.player.isHeadInGround = true;
+              state.player.state = 'HEAD_IN_GROUND';
+              state.player.vel.set(0, 0, 0);
+              showHitBanner("HEAD-IN-GROUND DOWNSLAM FINISHER!!");
+            } else {
+              playPunchSound(data.dmg > 8);
               triggerScreenShake(0.35);
               spawnDebris(yuji.root.position, 8);
               state.player.state = 'STUNNED';
-              state.player.stunTimer = 0.7;
-              if (state.player.hp <= 0) {
-                triggerPlayerDeath();
+              state.player.stunTimer = data.stunTimer || 0.7;
+              if (data.velX !== undefined) {
+                state.player.vel.set(-data.velX * 0.5, 0, -data.velZ * 0.5);
               }
+            }
+
+            if (state.player.hp <= 0) {
+              triggerPlayerDeath();
             }
           }
         } else if (data.type === 'AWAKEN_START') {
@@ -3807,6 +3891,20 @@
         }
       }
     });
+
+    function handleJoystickMove(clientX, clientY) {
+      const dx = clientX - joystickCenter.x;
+      const dy = clientY - joystickCenter.y;
+      const maxRadius = 26;
+      const dist = Math.hypot(dx, dy);
+      const clampedDist = Math.min(dist, maxRadius);
+      const nx = dist === 0 ? 0 : dx / dist;
+      const ny = dist === 0 ? 0 : dy / dist;
+      joystickVector.x = nx * (clampedDist / maxRadius);
+      joystickVector.y = ny * (clampedDist / maxRadius);
+      knob.style.transform = `translate(${nx * clampedDist}px, ${ny * clampedDist}px)`;
+    }
+
     // High-frequency multiplayer sync loop (30Hz tick, runs even when tab is backgrounded)
     setInterval(() => {
       if (!state.multiplayer.active || !state.multiplayer.conn || !state.multiplayer.conn.open) return;
@@ -3885,6 +3983,22 @@
         if (state.player.stunTimer <= 0) {
           if (state.player.state === 'STUNNED' || state.player.state === 'BLOCK_BROKEN') {
             state.player.state = 'IDLE';
+            updatePlayerUI();
+          }
+        }
+      }
+
+      if (state.player.state === 'RAGDOLL' || state.player.state === 'LAUNCHED_BACK') {
+        if (state.player.ragdollTimer > 0) {
+          state.player.ragdollTimer -= dt;
+          if (state.player.ragdollTimer <= 0) {
+            state.player.state = 'IDLE';
+            state.player.isSuperLaunching = false;
+            state.player.isHeadInGround = false;
+            yuji.pelvis.position.y = 1.6;
+            yuji.pelvis.rotation.set(0, 0, 0);
+            yuji.torso.rotation.set(0, 0, 0);
+            yuji.head.rotation.set(0, 0, 0);
             updatePlayerUI();
           }
         }
@@ -4254,36 +4368,13 @@
         dummy.torso.rotation.x = 0.25;
       } else {
         dummy.pelvis.position.y = 1.6 + Math.sin(clock.getElapsedTime() * 2.5) * 0.03;
-        dummy.torso.rotation.y = Math.sin(clock.getElapsedTime() * 1.5) * 0.08;
       }
 
-      const isMoving = (state.player.vel.lengthSq() > 1.2);
-      const walkTime = clock.getElapsedTime() * 14;
-      const animProgress = state.player.actionDuration > 0 ? (1 - (state.player.actionTimer / state.player.actionDuration)) : 0;
+      const animProgress = state.player.actionDuration > 0 ? (1 - (state.player.actionTimer / state.player.actionDuration)) : 1;
+      const isMoving = !state.player.isDead && (moveDir.lengthSq() > 0.01 || state.player.vel.lengthSq() > 0.4);
+      const walkTime = time * 12;
 
-      yuji.torso.rotation.set(0, 0, 0);
-      yuji.pelvis.rotation.set(0, 0, 0);
-      yuji.pelvis.position.y = 1.6;
-      yuji.head.rotation.set(0, 0, 0);
-      yuji.leftArmPivot.rotation.set(0, 0, 0);
-      yuji.rightArmPivot.rotation.set(0, 0, 0);
-      yuji.leftElbow.rotation.set(0, 0, 0);
-      yuji.rightElbow.rotation.set(0, 0, 0);
-      yuji.leftLegPivot.rotation.set(0, 0, 0);
-      yuji.rightLegPivot.rotation.set(0, 0, 0);
-      yuji.leftKnee.rotation.set(0, 0, 0);
-      yuji.rightKnee.rotation.set(0, 0, 0);
-
-      if (yuji.aura) {
-        if (state.player.chainWindowTimer > 0 || state.player.inZone) {
-          yuji.aura.material.opacity = 0.75 + Math.sin(clock.getElapsedTime() * 18) * 0.25;
-          yuji.aura.rotation.y += 0.1;
-        } else {
-          yuji.aura.material.opacity = 0;
-        }
-      }
-
-      if (state.player.isDead) {
+      if (state.player.isDead && !state.player.isHeadInGround) {
         yuji.pelvis.position.y = 0.22;
         yuji.pelvis.rotation.x = -Math.PI / 2;
         yuji.torso.rotation.set(0, 0, 0);
@@ -4292,6 +4383,35 @@
         yuji.rightLegPivot.rotation.set(0, 0, -0.1);
         yuji.leftArmPivot.rotation.set(0, 0, 0.5);
         yuji.rightArmPivot.rotation.set(0, 0, -0.5);
+      } else if (state.player.isHeadInGround || state.player.state === 'HEAD_IN_GROUND') {
+        yuji.pelvis.position.y = 1.42;
+        yuji.pelvis.rotation.set(Math.PI, 0, 0);
+        yuji.torso.rotation.set(0, 0, 0);
+        yuji.head.position.set(0, 0.33, 0);
+        yuji.head.rotation.set(0, 0, 0);
+        yuji.leftLegPivot.rotation.set(0.08, 0, 0.22);
+        yuji.rightLegPivot.rotation.set(-0.08, 0, -0.22);
+        yuji.leftKnee.rotation.set(-0.2, 0, 0);
+        yuji.rightKnee.rotation.set(-0.15, 0, 0);
+        yuji.leftArmPivot.rotation.set(Math.PI - 0.25, 0.15, -0.65);
+        yuji.rightArmPivot.rotation.set(Math.PI - 0.25, -0.15, 0.65);
+      } else if (state.player.state === 'RAGDOLL') {
+        yuji.pelvis.position.y = 0.22;
+        yuji.pelvis.rotation.x = -Math.PI / 2;
+        yuji.torso.rotation.set(0, 0, 0);
+        yuji.head.rotation.set(-0.2, 0, 0);
+        yuji.leftLegPivot.rotation.set(0, 0, 0.1);
+        yuji.rightLegPivot.rotation.set(0, 0, -0.1);
+        yuji.leftArmPivot.rotation.set(0, 0, 0.4);
+        yuji.rightArmPivot.rotation.set(0, 0, -0.4);
+      } else if (state.player.state === 'LAUNCHED_BACK') {
+        yuji.pelvis.position.y = 1.7;
+        yuji.torso.rotation.x = -0.7;
+        yuji.head.rotation.x = 0.6;
+        yuji.leftArmPivot.rotation.x = 1.2;
+        yuji.rightArmPivot.rotation.x = 1.2;
+        yuji.leftLegPivot.rotation.x = -0.8;
+        yuji.rightLegPivot.rotation.x = -0.8;
       } else if (state.player.state === 'BLOCK_BROKEN') {
         yuji.pelvis.position.y = 1.45;
         yuji.torso.rotation.x = -0.4;
