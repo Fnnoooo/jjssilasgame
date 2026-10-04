@@ -1,0 +1,3610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Jujutsu Shenanigans - Yuji (Beach Island Edition)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js 3D Engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Tone.js for Real-Time Procedural Sound Design -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- Anime Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Black+Ops+One&family=Rajdhani:wght@600;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      font-family: 'Rajdhani', sans-serif;
+      background: #7ec0ee;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .combat-font {
+      font-family: 'Bangers', cursive;
+      letter-spacing: 1px;
+    }
+    .jjs-font {
+      font-family: 'Black Ops One', cursive;
+    }
+    .impact-invert {
+      filter: invert(1) contrast(4) saturate(0) brightness(1.2) !important;
+    }
+    .impact-crimson {
+      filter: contrast(3) saturate(2.5) hue-rotate(330deg) !important;
+    }
+    .black-flash-vignette {
+      background: radial-gradient(circle, transparent 30%, rgba(185, 28, 28, 0.4) 65%, rgba(0, 0, 0, 0.98) 100%);
+    }
+    .awakened-vignette {
+      background: radial-gradient(circle, transparent 35%, rgba(220, 38, 38, 0.5) 70%, rgba(10, 0, 3, 0.98) 100%);
+    }
+    @keyframes pulse-ready {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 14px rgba(245, 158, 11, 0.8), inset 0 0 8px rgba(245, 158, 11, 0.4);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 24px rgba(239, 68, 68, 1), inset 0 0 14px rgba(239, 68, 68, 0.7);
+      }
+    }
+    .ult-ready-anim {
+      animation: pulse-ready 0.85s infinite ease-in-out;
+      border-color: #f59e0b !important;
+    }
+    @keyframes pulse-active {
+      0%, 100% { box-shadow: 0 0 16px #dc2626; }
+      50% { box-shadow: 0 0 30px #ff003b; }
+    }
+    .ult-active-anim {
+      animation: pulse-active 0.65s infinite alternate ease-in-out;
+      border-color: #ef4444 !important;
+    }
+
+    body.shift-lock-cursor-hidden,
+    body.shift-lock-cursor-hidden * {
+      cursor: none !important;
+    }
+
+    .shift-lock-crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      transition: all 0.15s ease-out;
+    }
+    .shift-lock-active {
+      width: 22px;
+      height: 22px;
+    }
+    .shift-lock-active .reticle-dot {
+      background-color: #00f0ff !important;
+      box-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff !important;
+    }
+
+    #speed-lines-canvas {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s ease-out;
+      z-index: 25;
+    }
+
+    .cinematic-bar-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 0;
+      background: #000000;
+      z-index: 45;
+      transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .cinematic-bar-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0;
+      background: #000000;
+      z-index: 45;
+      transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .cinematic-active .cinematic-bar-top,
+    .cinematic-active .cinematic-bar-bottom {
+      height: 9vh;
+    }
+    .hud-hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: scale(0.92) !important;
+      transition: opacity 0.35s ease, transform 0.35s ease !important;
+    }
+
+    @media (max-height: 540px) {
+      .compact-top-hud {
+        transform: scale(0.72) translateX(-69%) !important;
+        top: 2px !important;
+      }
+      .compact-hotbar {
+        transform: scale(0.78) translateX(-64%) !important;
+        bottom: 2px !important;
+      }
+      .mobile-joy-container {
+        bottom: 8px !important;
+        left: 8px !important;
+        width: 58px !important;
+        height: 58px !important;
+      }
+    }
+  </style>
+</head>
+<body class="relative w-full h-full bg-[#7ec0ee] select-none overflow-hidden touch-none">
+  <div id="canvas-container" class="absolute inset-0 z-0 touch-none"></div>
+
+  <canvas id="speed-lines-canvas"></canvas>
+  <div id="impact-overlay" class="absolute inset-0 pointer-events-none z-30 opacity-0 transition-opacity duration-75"></div>
+  <div id="zone-overlay" class="absolute inset-0 pointer-events-none z-20 opacity-0 transition-opacity duration-300 black-flash-vignette"></div>
+
+  <div id="cinematic-top" class="cinematic-bar-top"></div>
+  <div id="cinematic-bottom" class="cinematic-bar-bottom"></div>
+
+  <div id="cinematic-title-box" class="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-center opacity-0 transition-opacity duration-400">
+    <span class="combat-font text-red-500 text-xs sm:text-base tracking-[0.4em] uppercase font-bold animate-pulse drop-shadow-[0_0_12px_#ef4444]">THE ESSENCE OF CURSED ENERGY</span>
+    <h1 id="cinematic-sub-text" class="jjs-font text-2xl sm:text-4xl font-black text-white tracking-widest uppercase drop-shadow-[0_0_28px_#dc2626] mt-1 text-center">SPATIAL HARMONY</h1>
+    <span class="text-gray-300 text-[10px] tracking-widest uppercase mt-1">DRAG SCREEN TO ORBIT CAMERA FREELY</span>
+    <div class="w-32 h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent mt-2"></div>
+  </div>
+
+  <div id="crosshair-el" class="shift-lock-crosshair z-20 flex items-center justify-center pointer-events-none">
+    <div id="reticle-dot" class="reticle-dot w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_#ef4444] transition-all"></div>
+    <div id="reticle-bracket-l" class="hidden absolute -left-2.5 w-1 h-3 border-l-2 border-cyan-400"></div>
+    <div id="reticle-bracket-r" class="hidden absolute -right-2.5 w-1 h-3 border-r-2 border-cyan-400"></div>
+  </div>
+
+  <div id="game-hud-wrapper" class="absolute inset-0 pointer-events-none z-20 transition-all duration-300">
+    <div class="compact-top-hud absolute top-2 left-1/2 -translate-x-1/2 z-20 w-[92vw] max-w-sm flex flex-col gap-1 pointer-events-none scale-85 sm:scale-95 origin-top transition-transform">
+      <!-- Player HP Bar -->
+      <div class="bg-gray-950/85 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-red-900/40 shadow-xl flex flex-col gap-1">
+        <div class="flex justify-between items-center text-[10px] font-bold text-gray-200 leading-none">
+          <div class="flex items-center gap-1.5">
+            <span class="jjs-font text-red-400 text-[11px] tracking-wider">YUJI ITADORI</span>
+            <span id="player-state-text" class="text-[8px] text-gray-400 font-bold">READY</span>
+            <span id="zone-badge" class="hidden text-[7px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded shadow-[0_0_8px_#ef4444] tracking-wider">120% AWAKENED</span>
+          </div>
+          <span id="player-hp-num" class="text-red-400 font-mono text-[9px] font-bold">100 / 100</span>
+        </div>
+        <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden border border-red-950">
+          <div id="player-hp-bar" class="h-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 rounded-full transition-all duration-150 w-full shadow-[0_0_8px_#ef4444]"></div>
+        </div>
+      </div>
+
+      <!-- Enemy HP Bar -->
+      <div id="enemy-card" class="bg-gray-950/85 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-purple-900/40 shadow-xl flex flex-col gap-1">
+        <div class="flex justify-between items-center text-[10px] font-bold text-gray-200 leading-none">
+          <div class="flex items-center gap-1.5">
+            <span class="jjs-font text-purple-400 text-[11px] tracking-wider">MAHITO</span>
+            <span id="enemy-stun-tag" class="hidden text-[7px] bg-yellow-600 text-black font-bold px-1 rounded">STUNNED</span>
+            <span id="enemy-ragdoll-tag" class="hidden text-[7px] bg-blue-600 text-white font-bold px-1 rounded">DOWNED (IMMUNE)</span>
+          </div>
+          <span id="enemy-hp-num" class="text-purple-400 font-mono text-[9px] font-bold">100%</span>
+        </div>
+        <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden border border-purple-950">
+          <div id="enemy-hp-bar" class="h-full bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-400 rounded-full transition-all duration-150 w-full shadow-[0_0_6px_#9333ea]"></div>
+        </div>
+      </div>
+
+      <!-- Ultimate Bar -->
+      <div class="w-full flex items-center gap-1.5 text-[9px] leading-none mt-0.5 bg-gray-950/85 backdrop-blur-md px-2.5 py-1 rounded-lg border border-yellow-900/40">
+        <span class="text-amber-400 font-bold uppercase text-[8px] tracking-tighter" id="ult-label">ULT</span>
+        <div class="flex-1 bg-gray-900 h-2 rounded-full overflow-hidden border border-yellow-900/50 relative">
+          <div id="awakening-bar" class="h-full bg-gradient-to-r from-yellow-500 via-amber-400 to-red-500 rounded-full transition-all duration-100 w-0 shadow-[0_0_8px_#f59e0b]"></div>
+        </div>
+        <span id="awakening-pct" class="text-yellow-400 font-mono font-bold text-[9px] min-w-[38px] text-right">0%</span>
+      </div>
+    </div>
+
+    <!-- Black Flash Streak Counter & Hit Banner -->
+    <div class="absolute left-2.5 top-24 z-20 pointer-events-none flex flex-col items-start gap-1 scale-80 sm:scale-95 origin-left">
+      <div id="bf-chain-container" class="opacity-0 transform -translate-x-4 transition-all duration-150 flex flex-col">
+        <span class="text-[8px] uppercase tracking-widest text-red-400 font-black jjs-font drop-shadow-sm">KOKUSEN</span>
+        <div class="flex items-baseline gap-1">
+          <span id="bf-count-num" class="combat-font text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-red-500 to-black drop-shadow-[0_0_16px_#ef4444]">1</span>
+          <span class="jjs-font text-sm text-red-500 font-extrabold italic">SPARKS</span>
+        </div>
+        <div id="bf-tier-title" class="combat-font text-[10px] text-yellow-300 tracking-tight drop-shadow-md">SPATIAL DISTORTION!</div>
+      </div>
+
+      <div id="combo-hit-banner" class="opacity-0 transition-opacity duration-150 text-white font-extrabold text-[11px] combat-font tracking-wide bg-black/90 px-2 py-0.5 rounded border-l-2 border-red-500 shadow-lg mt-1">
+        <span id="combo-hit-text" class="text-red-400">4-HIT STRIKE</span>
+      </div>
+    </div>
+
+    <div class="compact-hotbar absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1 w-full px-1 scale-90 sm:scale-100 origin-bottom pointer-events-auto transition-transform">
+      <div id="chain-window-indicator" class="opacity-0 transition-opacity duration-100 flex items-center gap-1.5 bg-red-950/95 text-red-200 border border-red-500 px-3 py-0.5 rounded-full shadow-[0_0_14px_#dc2626]">
+        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+        <span id="chain-timer-label" class="text-[8px] sm:text-[9px] font-black tracking-wider uppercase">CHAIN ACTIVE: 1.0s REMAINING</span>
+      </div>
+
+      <div class="flex items-center gap-1 bg-gray-950/90 backdrop-blur-md p-1.5 rounded-xl border border-gray-800 shadow-2xl max-w-full overflow-x-auto">
+        <!-- M1 Punch -->
+        <button id="btn-m1" class="relative group w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-b from-gray-800 to-gray-900 border border-red-950 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-red-600 shadow-sm shrink-0">
+          <span class="text-[6px] text-gray-400 font-bold leading-none">M1</span>
+          <span class="text-[10px] font-black text-gray-100 combat-font leading-none">PUNCH</span>
+          <div id="m1-step-dots" class="flex gap-0.5 mt-0.5">
+            <span class="w-1 h-1 rounded-full bg-red-500 shadow-[0_0_4px_#ef4444]"></span>
+            <span class="w-1 h-1 rounded-full bg-gray-700"></span>
+            <span class="w-1 h-1 rounded-full bg-gray-700"></span>
+            <span class="w-1 h-1 rounded-full bg-gray-700"></span>
+          </div>
+        </button>
+
+        <!-- Move 1: Divergent Fist (6s CD / 7 DMG) / Ult: Soul Dismantle (15 DMG) -->
+        <button id="btn-skill-1" class="relative group w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-b from-gray-800 to-gray-900 border border-blue-950 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-blue-500 shadow-sm shrink-0">
+          <span class="absolute top-0.5 left-1 text-[7px] font-bold text-blue-400 bg-blue-950/80 px-1 rounded leading-none">1</span>
+          <span id="label-skill-1" class="text-[8px] sm:text-[9px] font-black text-blue-300 combat-font leading-tight text-center px-0.5 mt-1">DIVERGENT</span>
+          <div id="cd-1" class="absolute inset-0 bg-black/85 rounded-lg flex items-center justify-center text-[10px] font-bold text-blue-300 font-mono hidden">6.0</div>
+        </button>
+
+        <!-- Move 2: Manji Kick (7s CD / 9 DMG) / Ult: Piercing Blood (15 DMG) -->
+        <button id="btn-skill-2" class="relative group w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-b from-gray-800 to-gray-900 border border-orange-950 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-orange-500 shadow-sm shrink-0">
+          <span class="absolute top-0.5 left-1 text-[7px] font-bold text-orange-400 bg-orange-950/80 px-1 rounded leading-none">2</span>
+          <span id="label-skill-2" class="text-[8px] sm:text-[9px] font-black text-orange-300 combat-font leading-tight text-center px-0.5 mt-1">MANJI</span>
+          <div id="cd-2" class="absolute inset-0 bg-black/85 rounded-lg flex items-center justify-center text-[10px] font-bold text-orange-300 font-mono hidden">7.0</div>
+        </button>
+
+        <!-- Move 3: Cursed Dropkick (11s CD / 15 DMG) / Ult: Cleave Rush (15 DMG) -->
+        <button id="btn-skill-3" class="relative group w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-b from-emerald-950 via-gray-900 to-gray-950 border border-emerald-950 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-emerald-500 shadow-sm shrink-0">
+          <span class="absolute top-0.5 left-1 text-[7px] font-bold text-emerald-400 bg-emerald-950/80 px-1 rounded leading-none">3</span>
+          <span id="label-skill-3" class="text-[8px] sm:text-[9px] font-black text-emerald-300 combat-font leading-tight text-center px-0.5 mt-1">DROPKICK</span>
+          <div id="cd-3" class="absolute inset-0 bg-black/85 rounded-lg flex items-center justify-center text-[10px] font-bold text-emerald-300 font-mono hidden">11.0</div>
+        </button>
+
+        <!-- Move 4: Black Flash (10 DMG, strict 1s chain) / Ult: 8x Barrage (4 DMG x 8) -->
+        <button id="btn-skill-4" class="relative group w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-gradient-to-b from-red-950 via-gray-900 to-black border-2 border-red-500 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-red-400 shadow-[0_0_12px_#ef4444] shrink-0">
+          <span class="absolute top-0.5 left-1 text-[7px] font-black text-red-300 bg-red-900 px-1 rounded leading-none">4</span>
+          <span id="label-skill-4" class="text-[9px] sm:text-[10px] font-black text-white combat-font text-center leading-none tracking-tight drop-shadow-[0_0_4px_#dc2626] mt-0.5">BLACK FLASH</span>
+          <span id="sub-skill-4" class="text-[6px] font-black text-red-400 uppercase tracking-tighter">1s CHAIN</span>
+          <div id="cd-4" class="absolute inset-0 bg-black/85 rounded-lg flex items-center justify-center text-[10px] font-bold text-red-400 font-mono hidden">5.0</div>
+        </button>
+
+        <!-- Q: Dash -->
+        <button id="btn-dash" class="relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-gray-700 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-gray-400 shrink-0">
+          <span class="text-[6px] text-gray-400 font-bold uppercase leading-none">Q</span>
+          <span class="text-[8px] font-black text-gray-200 combat-font leading-none">DASH</span>
+        </button>
+
+        <!-- Space: Jump / Downslam Prep -->
+        <button id="btn-jump" class="relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-emerald-800 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-emerald-400 shrink-0">
+          <span class="text-[6px] text-emerald-400 font-bold uppercase leading-none">SPC</span>
+          <span class="text-[8px] font-black text-emerald-300 combat-font leading-none">JUMP</span>
+        </button>
+
+        <!-- F: Guard -->
+        <button id="btn-block" class="relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-blue-900 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-blue-500 shrink-0">
+          <span class="text-[6px] text-blue-400 font-bold uppercase leading-none">F</span>
+          <span class="text-[8px] font-black text-blue-300 combat-font leading-none">GUARD</span>
+        </button>
+
+        <!-- Shift Lock -->
+        <button id="btn-shiftlock" class="relative group w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-b from-gray-900 to-gray-950 border border-cyan-800 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-cyan-400 shadow-sm shrink-0">
+          <span class="text-[6px] text-cyan-400 font-bold uppercase leading-none">Shift/Z</span>
+          <span id="label-shiftlock" class="text-[8px] sm:text-[9px] font-black text-cyan-300 combat-font leading-tight text-center">LOCK OFF</span>
+        </button>
+
+        <!-- G: Awakening -->
+        <button id="btn-awaken" class="relative group w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-b from-gray-900 to-black border border-gray-800 flex flex-col items-center justify-center transition-all active:scale-90 shadow-md shrink-0 opacity-40 cursor-not-allowed">
+          <span class="text-[6px] text-yellow-500 font-bold uppercase leading-none">G</span>
+          <span id="label-awaken" class="text-[8px] sm:text-[9px] font-black text-gray-400 combat-font text-center leading-none">LOCKED</span>
+          <span id="sub-awaken" class="text-[6px] font-black text-yellow-600 uppercase">0%</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Top Right Utility Buttons -->
+    <div class="absolute top-2 right-2 z-20 flex items-center gap-1.5 scale-85 sm:scale-95 origin-top-right pointer-events-auto">
+      <button id="btn-sound" class="bg-gray-900/85 backdrop-blur-md px-2 py-1 rounded-md border border-gray-700 text-[10px] text-gray-200 font-bold hover:bg-gray-800 transition active:scale-95 shadow">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button id="btn-dummy-mode" class="bg-purple-950/90 backdrop-blur-md px-2.5 py-1 rounded-md border border-purple-600 text-[8px] text-purple-200 font-bold hover:bg-purple-900 transition active:scale-95 shadow flex items-center gap-1">
+        <span>AI:</span> <span id="dummy-mode-text" class="text-green-400 font-black">SANDBAG</span>
+      </button>
+      <button id="btn-reset-dummy" class="bg-red-950/85 backdrop-blur-md px-2 py-1 rounded-md border border-red-800 text-[8px] text-red-200 font-bold hover:bg-red-900 transition active:scale-95 shadow">
+        Respawn
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Touch Virtual Joystick -->
+  <div id="mobile-controls" class="mobile-joy-container absolute bottom-4 left-4 z-30 w-16 h-16 rounded-full border border-gray-700/60 bg-black/45 touch-none flex items-center justify-center pointer-events-auto transition-transform">
+    <div id="joystick-knob" class="mobile-joy-knob w-6 h-6 rounded-full bg-red-600/80 border border-red-400 shadow pointer-events-none"></div>
+  </div>
+
+  <script>
+    let audioInitialized = false;
+    let masterVolume = null;
+    let hitSynth = null;
+    let heavyImpactSynth = null;
+    let blackFlashSub = null;
+    let blackFlashSnap = null;
+    let blackFlashDistort = null;
+    let lightningNoise = null;
+    let awakeningLead = null;
+    let slashSynth = null;
+    let cinematicDrone = null;
+    let heartbeatSynth = null;
+
+    let ostKick = null;
+    let ostBass = null;
+    let ostLead = null;
+    let ostHihat = null;
+    let ostPlaying = false;
+    let ostStep = 0;
+    let ostRepeatId = null;
+
+    function initAudio() {
+      if (audioInitialized) return;
+      try {
+        if (window.Tone) {
+          Tone.start();
+          masterVolume = new Tone.Volume(-2).toDestination();
+
+          hitSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 5.0,
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.001, decay: 0.16, sustain: 0.01, release: 0.1 }
+          }).connect(masterVolume);
+
+          heavyImpactSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.08,
+            octaves: 7.0,
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.001, decay: 0.35, sustain: 0.02, release: 0.25 }
+          }).connect(masterVolume);
+
+          blackFlashSnap = new Tone.NoiseSynth({
+            noise: { type: 'white' },
+            envelope: { attack: 0.001, decay: 0.035, sustain: 0 }
+          }).connect(masterVolume);
+
+          blackFlashDistort = new Tone.Synth({
+            oscillator: { type: 'sawtooth' },
+            envelope: { attack: 0.001, decay: 0.28, sustain: 0.04, release: 0.22 }
+          }).connect(masterVolume);
+
+          blackFlashSub = new Tone.MonoSynth({
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.003, decay: 1.4, sustain: 0.2, release: 1.1 },
+            filterEnvelope: { attack: 0.001, decay: 0.45, sustain: 0.15, release: 0.9, baseFrequency: 160, octaves: 4.0 }
+          }).connect(masterVolume);
+
+          lightningNoise = new Tone.NoiseSynth({
+            noise: { type: 'pink' },
+            envelope: { attack: 0.002, decay: 0.4, sustain: 0 }
+          }).connect(masterVolume);
+
+          slashSynth = new Tone.NoiseSynth({
+            noise: { type: 'white' },
+            envelope: { attack: 0.001, decay: 0.15, sustain: 0 }
+          }).connect(masterVolume);
+
+          awakeningLead = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'sawtooth' },
+            envelope: { attack: 0.04, decay: 0.45, sustain: 0.25, release: 0.6 }
+          }).connect(masterVolume);
+
+          cinematicDrone = new Tone.MonoSynth({
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.8, decay: 2.0, sustain: 0.8, release: 1.5 },
+            filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+            filterEnvelope: { attack: 0.5, decay: 1.5, sustain: 0.6, release: 1.5, baseFrequency: 60, octaves: 2.5 }
+          }).connect(masterVolume);
+
+          heartbeatSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.08,
+            octaves: 2.5,
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.25 }
+          }).connect(masterVolume);
+
+          ostKick = new Tone.MembraneSynth({
+            pitchDecay: 0.06,
+            octaves: 6,
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.2 }
+          }).connect(masterVolume);
+
+          ostBass = new Tone.MonoSynth({
+            oscillator: { type: 'sawtooth' },
+            filter: { Q: 3.5, type: 'lowpass', rolloff: -24 },
+            envelope: { attack: 0.01, decay: 0.22, sustain: 0.45, release: 0.2 },
+            filterEnvelope: { attack: 0.01, decay: 0.22, sustain: 0.2, release: 0.2, baseFrequency: 85, octaves: 3.2 }
+          }).connect(masterVolume);
+
+          ostLead = new Tone.Synth({
+            oscillator: { type: 'square' },
+            envelope: { attack: 0.01, decay: 0.14, sustain: 0.1, release: 0.1 }
+          }).connect(masterVolume);
+
+          ostHihat = new Tone.NoiseSynth({
+            noise: { type: 'white' },
+            envelope: { attack: 0.001, decay: 0.04, sustain: 0 }
+          }).connect(masterVolume);
+
+          Tone.Transport.bpm.value = 142;
+          const bassNotes = ['D1', 'D1', 'F1', 'D1', 'G1', 'D1', 'A#0', 'C1'];
+          const leadArp = ['D4', 'F4', 'A4', 'D5', 'C5', 'A4', 'F4', 'E4'];
+
+          if (ostRepeatId === null) {
+            ostRepeatId = Tone.Transport.scheduleRepeat((time) => {
+              if (!ostPlaying) return;
+              if (ostStep % 4 === 0 && ostKick) {
+                ostKick.triggerAttackRelease('C1', '8n', time, 0.95);
+              }
+              if (ostStep % 2 === 1 && ostHihat) {
+                ostHihat.triggerAttackRelease('16n', time, 0.45);
+              }
+              if (ostStep % 2 === 0 && ostBass) {
+                const bNote = bassNotes[(ostStep / 2) % bassNotes.length];
+                ostBass.triggerAttackRelease(bNote, '8n', time, 0.78);
+              }
+              if (ostLead) {
+                const lNote = leadArp[ostStep % leadArp.length];
+                ostLead.triggerAttackRelease(lNote, '16n', time, 0.32);
+              }
+              ostStep = (ostStep + 1) % 16;
+            }, '16n');
+          }
+
+          audioInitialized = true;
+        }
+      } catch (err) {
+        console.warn("Tone.js deferred", err);
+      }
+    }
+
+    function startAwakeningOST() {
+      if (!audioInitialized) initAudio();
+      try {
+        if (window.Tone) {
+          if (Tone.context.state !== 'running') {
+            Tone.context.resume();
+          }
+          ostStep = 0;
+          ostPlaying = true;
+          Tone.Transport.seconds = 0;
+          Tone.Transport.start();
+        }
+      } catch (e) {
+        console.warn("Error starting OST:", e);
+      }
+    }
+
+    function stopAwakeningOST() {
+      try {
+        ostPlaying = false;
+        if (window.Tone && Tone.Transport) {
+          Tone.Transport.stop();
+          Tone.Transport.seconds = 0;
+        }
+      } catch (e) {}
+    }
+
+    function playPunchSound(heavy = false) {
+      if (!audioInitialized) return;
+      try {
+        if (heavy && heavyImpactSynth) {
+          heavyImpactSynth.triggerAttackRelease('A0', '8n');
+          if (lightningNoise) lightningNoise.triggerAttackRelease('32n', '+0.01');
+        } else if (hitSynth) {
+          const pitch = Math.random() > 0.5 ? 'G1' : 'A1';
+          hitSynth.triggerAttackRelease(pitch, '16n');
+        }
+      } catch (e) {}
+    }
+
+    function playBlackFlashSound(chainCount = 1) {
+      if (!audioInitialized) return;
+      try {
+        if (blackFlashSnap) {
+          blackFlashSnap.triggerAttackRelease('32n');
+        }
+        if (blackFlashDistort) {
+          const notes = ['D2', 'F2', 'A2', 'D3', 'F3'];
+          const note = notes[Math.min(chainCount - 1, notes.length - 1)];
+          blackFlashDistort.triggerAttackRelease(note, '16n', '+0.008', 0.95);
+        }
+        if (blackFlashSub) {
+          const subNote = chainCount > 3 ? 'B-1' : (chainCount > 1 ? 'C0' : 'D0');
+          blackFlashSub.triggerAttackRelease(subNote, '1n', '+0.01', 1.0);
+        }
+        if (lightningNoise) {
+          lightningNoise.triggerAttackRelease('8n', '+0.015');
+        }
+      } catch (e) {}
+    }
+
+    function playDodgeSound() {
+      if (!audioInitialized || !lightningNoise) return;
+      try {
+        lightningNoise.triggerAttackRelease('32n');
+      } catch (e) {}
+    }
+
+    function playAwakenSound() {
+      if (!audioInitialized || !awakeningLead) return;
+      try {
+        awakeningLead.triggerAttackRelease(['D3', 'A3', 'D4', 'F4', 'A4', 'D5'], '1n');
+        if (blackFlashSub) blackFlashSub.triggerAttackRelease('D0', '1n', '+0.05');
+      } catch (e) {}
+    }
+
+    function createProceduralSandTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#e8d5a7';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Fine grain noise
+      for (let i = 0; i < 45000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const shade = Math.random() > 0.5 ? 245 : 205;
+        const alpha = 0.07 + Math.random() * 0.12;
+        ctx.fillStyle = `rgba(${shade}, ${shade - 20}, ${shade - 50}, ${alpha})`;
+        ctx.fillRect(x, y, 1.5, 1.5);
+      }
+
+      // Gentle wind ripples
+      ctx.strokeStyle = 'rgba(210, 185, 130, 0.22)';
+      ctx.lineWidth = 3;
+      for (let y = 0; y < 512; y += 18) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        for (let x = 0; x <= 512; x += 32) {
+          ctx.lineTo(x, y + Math.sin(x * 0.05) * 4);
+        }
+        ctx.stroke();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(8, 8);
+      return tex;
+    }
+
+    function createProceduralBarkTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#7a5230';
+      ctx.fillRect(0, 0, 256, 256);
+
+      // Horizontal segment rings of palm tree bark
+      for (let y = 0; y < 256; y += 14) {
+        ctx.fillStyle = '#55361b';
+        ctx.fillRect(0, y, 256, 4);
+        ctx.fillStyle = '#94663e';
+        ctx.fillRect(0, y + 4, 256, 3);
+      }
+      for (let i = 0; i < 3000; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+        ctx.fillStyle = 'rgba(40, 22, 10, 0.18)';
+        ctx.fillRect(x, y, 2, 2);
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, 4);
+      return tex;
+    }
+
+    function createProceduralPalmLeafTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#2d8028';
+      ctx.fillRect(0, 0, 128, 512);
+
+      // Center stem vein
+      ctx.fillStyle = '#9fd64b';
+      ctx.fillRect(60, 0, 8, 512);
+
+      // Angled leaf blade strips
+      ctx.strokeStyle = '#1b5a17';
+      ctx.lineWidth = 2;
+      for (let y = 0; y < 512; y += 8) {
+        ctx.beginPath();
+        ctx.moveTo(64, y);
+        ctx.lineTo(8, y + 16);
+        ctx.moveTo(64, y);
+        ctx.lineTo(120, y + 16);
+        ctx.stroke();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      return tex;
+    }
+
+    function createProceduralRockTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#5a5b61';
+      ctx.fillRect(0, 0, 256, 256);
+
+      for (let i = 0; i < 4000; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+        const c = 60 + Math.random() * 60;
+        ctx.fillStyle = `rgb(${c}, ${c}, ${c + 4})`;
+        ctx.fillRect(x, y, 2, 2);
+      }
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x76bced);
+    scene.fog = new THREE.FogExp2(0xb6dcf5, 0.007);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    // Warm Tropical Daylight Sun
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.0);
+    sunLight.position.set(70, 95, -60);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 1024;
+    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 260;
+    const shadowDist = 45;
+    sunLight.shadow.camera.left = -shadowDist;
+    sunLight.shadow.camera.right = shadowDist;
+    sunLight.shadow.camera.top = shadowDist;
+    sunLight.shadow.camera.bottom = -shadowDist;
+    scene.add(sunLight);
+
+    // Ambient Tropical Atmosphere (sky blue & warm sand bounce)
+    const ambientLight = new THREE.HemisphereLight(0x87ceeb, 0xdfc999, 1.15);
+    scene.add(ambientLight);
+
+    // Visible Glowing Sun in the Sky (Sphere only, no floating ring geometries)
+    const sunMeshGeo = new THREE.SphereGeometry(7, 16, 16);
+    const sunMeshMat = new THREE.MeshBasicMaterial({ color: 0xfffae0 });
+    const sunMesh = new THREE.Mesh(sunMeshGeo, sunMeshMat);
+    sunMesh.position.set(120, 160, -110);
+    scene.add(sunMesh);
+
+    const sunCoronaGeo = new THREE.SphereGeometry(14, 16, 16);
+    const sunCoronaMat = new THREE.MeshBasicMaterial({ color: 0xffe680, transparent: true, opacity: 0.35, depthWrite: false });
+    const sunCorona = new THREE.Mesh(sunCoronaGeo, sunCoronaMat);
+    sunCorona.position.copy(sunMesh.position);
+    scene.add(sunCorona);
+
+    const bloodBeamGeo = new THREE.CylinderGeometry(0.2, 0.2, 42, 12);
+    const bloodBeamMat = new THREE.MeshBasicMaterial({ color: 0xff002b, transparent: true, opacity: 0, depthWrite: false });
+    const bloodBeam = new THREE.Mesh(bloodBeamGeo, bloodBeamMat);
+    bloodBeam.visible = false;
+    bloodBeam.rotation.x = Math.PI / 2;
+    scene.add(bloodBeam);
+
+    const sandTexture = createProceduralSandTexture();
+    const barkTexture = createProceduralBarkTexture();
+    const leafTexture = createProceduralPalmLeafTexture();
+    const rockTexture = createProceduralRockTexture();
+
+    const islandRadius = 38;
+
+    // Heightmap function for natural dunes, hills, and shoreline slope
+    function getTerrainHeight(x, z) {
+      const dist = Math.hypot(x, z);
+      if (dist > 42) return -4.0; // Deep water drop-off
+      
+      // Gentle center arena (smooth elevation near 0 for clean combat)
+      let h = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.12;
+
+      // North-East rolling sand hill
+      const dHill1 = Math.hypot(x - 17, z + 16);
+      if (dHill1 < 16) {
+        h += Math.cos((dHill1 / 16) * (Math.PI / 2)) * 3.4;
+      }
+
+      // South-West coastal dune ridge
+      const dHill2 = Math.hypot(x + 19, z - 13);
+      if (dHill2 < 15) {
+        h += Math.cos((dHill2 / 15) * (Math.PI / 2)) * 2.6;
+      }
+
+      // North-West viewing mound
+      const dHill3 = Math.hypot(x + 16, z + 18);
+      if (dHill3 < 14) {
+        h += Math.cos((dHill3 / 14) * (Math.PI / 2)) * 2.2;
+      }
+
+      // Smooth shoreline decline dipping naturally into ocean water at radius 33+
+      if (dist > 28) {
+        const falloff = (dist - 28) / 13;
+        h = THREE.MathUtils.lerp(h, -2.8, Math.min(1.0, falloff * falloff));
+      }
+
+      return h;
+    }
+
+    // Sculpted seamless Island Terrain (NO hollow caps or floating circle rings)
+    const terrainSize = 96;
+    const terrainSegments = 90;
+    const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegments, terrainSegments);
+    terrainGeo.rotateX(-Math.PI / 2);
+
+    const terrainPos = terrainGeo.attributes.position;
+    for (let i = 0; i < terrainPos.count; i++) {
+      const vx = terrainPos.getX(i);
+      const vz = terrainPos.getZ(i);
+      terrainPos.setY(i, getTerrainHeight(vx, vz));
+    }
+    terrainGeo.computeVertexNormals();
+
+    const terrainMat = new THREE.MeshStandardMaterial({
+      map: sandTexture,
+      roughness: 0.94,
+      metalness: 0.02
+    });
+    const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+    terrainMesh.receiveShadow = true;
+    scene.add(terrainMesh);
+
+    // Realistic Moving Ocean Water with Dynamic Waves
+    const waterSegments = 120;
+    const waterSize = 340;
+    const waterGeo = new THREE.PlaneGeometry(waterSize, waterSize, waterSegments, waterSegments);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x0c9eb5,
+      roughness: 0.12,
+      metalness: 0.45,
+      transparent: true,
+      opacity: 0.86
+    });
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -0.15; // Set right at natural shoreline
+    scene.add(water);
+
+    // Store base vertices for realistic wave equations
+    const waterPosAttr = waterGeo.attributes.position;
+    const waterBaseZ = new Float32Array(waterPosAttr.count);
+    for (let i = 0; i < waterPosAttr.count; i++) {
+      waterBaseZ[i] = waterPosAttr.getZ(i);
+    }
+
+    const clamGroup = new THREE.Group();
+    scene.add(clamGroup);
+
+    // Clam Shell Material
+    const shellMat = new THREE.MeshStandardMaterial({
+      color: 0xfde8d0,
+      roughness: 0.6,
+      metalness: 0.15
+    });
+
+    // Starfish Material
+    const starfishMat = new THREE.MeshStandardMaterial({
+      color: 0xf97316,
+      roughness: 0.7,
+      metalness: 0.05
+    });
+
+    // Procedural Clam Shell Generator
+    function createClam(x, z, scale = 1.0, rotY = 0) {
+      const clam = new THREE.Group();
+      const groundY = getTerrainHeight(x, z);
+      clam.position.set(x, groundY + 0.04, z);
+      clam.rotation.y = rotY;
+
+      // Bottom Valve
+      const valveGeo = new THREE.CylinderGeometry(0.32 * scale, 0.45 * scale, 0.07 * scale, 8);
+      const bottomValve = new THREE.Mesh(valveGeo, shellMat);
+      bottomValve.scale.set(1, 1, 0.65);
+      bottomValve.castShadow = true;
+      clam.add(bottomValve);
+
+      // Top Valve slightly ajar
+      const topValve = bottomValve.clone();
+      topValve.position.set(0, 0.07 * scale, -0.05 * scale);
+      topValve.rotation.x = 0.35;
+      clam.add(topValve);
+
+      // Pearl / interior glint inside open clam
+      const pearlGeo = new THREE.SphereGeometry(0.08 * scale, 8, 8);
+      const pearlMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.8 });
+      const pearl = new THREE.Mesh(pearlGeo, pearlMat);
+      pearl.position.set(0, 0.06 * scale, 0.05 * scale);
+      clam.add(pearl);
+
+      clamGroup.add(clam);
+    }
+
+    // Procedural 5-Pointed Starfish Generator
+    function createStarfish(x, z, scale = 1.0, rotY = 0) {
+      const star = new THREE.Group();
+      const groundY = getTerrainHeight(x, z);
+      star.position.set(x, groundY + 0.03, z);
+      star.rotation.y = rotY;
+
+      const centerMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * scale, 0.22 * scale, 0.08 * scale, 8), starfishMat);
+      centerMesh.castShadow = true;
+      star.add(centerMesh);
+
+      const armGeo = new THREE.ConeGeometry(0.14 * scale, 0.65 * scale, 5);
+      for (let i = 0; i < 5; i++) {
+        const arm = new THREE.Mesh(armGeo, starfishMat);
+        const angle = (i / 5) * Math.PI * 2;
+        arm.position.set(Math.cos(angle) * 0.35 * scale, 0.02 * scale, Math.sin(angle) * 0.35 * scale);
+        arm.rotation.z = -Math.PI / 2;
+        arm.rotation.y = -angle + Math.PI / 2;
+        arm.castShadow = true;
+        star.add(arm);
+      }
+      clamGroup.add(star);
+    }
+
+    // Scatter Clams & Sea Shells along the sandy shoreline
+    createClam(-12, 18, 1.2, 0.4);
+    createClam(-18, 14, 0.9, 1.1);
+    createClam(20, -11, 1.3, -0.6);
+    createClam(14, 21, 1.0, 2.3);
+    createClam(-8, -22, 1.15, -1.8);
+    createClam(22, 12, 0.85, 0.9);
+    createClam(-22, -9, 1.25, 0.2);
+    createClam(6, -24, 1.0, -0.7);
+
+    // Scatter Colorful Starfish on the beach
+    createStarfish(-15, 17, 1.1, 0.3);
+    createStarfish(18, -14, 1.25, 1.5);
+    createStarfish(-6, 23, 0.95, 2.2);
+    createStarfish(21, 9, 1.0, -1.1);
+    createStarfish(-21, -12, 1.2, 0.8);
+
+    // Procedural 3D Palm Trees (elevated onto hills and dunes)
+    function createPalmTree(x, z, scale = 1.0, curveAngle = 0.2) {
+      const treeGroup = new THREE.Group();
+      const baseHeight = getTerrainHeight(x, z);
+      treeGroup.position.set(x, baseHeight, z);
+
+      // Curved Trunk
+      const trunkMat = new THREE.MeshStandardMaterial({ map: barkTexture, roughness: 0.85 });
+      const trunkSegments = 7;
+      let prevPart = treeGroup;
+      const segmentHeight = 1.1 * scale;
+
+      for (let i = 0; i < trunkSegments; i++) {
+        const rTop = (0.35 - i * 0.02) * scale;
+        const rBottom = (0.42 - i * 0.02) * scale;
+        const segGeo = new THREE.CylinderGeometry(rTop, rBottom, segmentHeight, 8);
+        const segMesh = new THREE.Mesh(segGeo, trunkMat);
+        segMesh.castShadow = true;
+        segMesh.receiveShadow = true;
+        segMesh.position.y = segmentHeight / 2;
+
+        const pivot = new THREE.Group();
+        pivot.position.y = (i === 0 ? 0 : segmentHeight);
+        pivot.rotation.z = Math.sin(curveAngle + i * 0.15) * 0.08;
+        pivot.rotation.x = Math.cos(curveAngle + i * 0.15) * 0.05;
+        pivot.add(segMesh);
+
+        prevPart.add(pivot);
+        prevPart = pivot;
+      }
+
+      // Palm Crown & Fronds
+      const crown = new THREE.Group();
+      crown.position.y = segmentHeight;
+      prevPart.add(crown);
+
+      // Coconuts
+      const coconutMat = new THREE.MeshStandardMaterial({ color: 0x4a2e16, roughness: 0.8 });
+      for (let c = 0; c < 3; c++) {
+        const cMesh = new THREE.Mesh(new THREE.SphereGeometry(0.25 * scale, 6, 6), coconutMat);
+        const cAngle = (c / 3) * Math.PI * 2;
+        cMesh.position.set(Math.cos(cAngle) * 0.3 * scale, -0.15 * scale, Math.sin(cAngle) * 0.3 * scale);
+        crown.add(cMesh);
+      }
+
+      // Arching Palm Fronds
+      const leafMat = new THREE.MeshStandardMaterial({
+        map: leafTexture,
+        side: THREE.DoubleSide,
+        roughness: 0.6,
+        metalness: 0.1
+      });
+      const numFronds = 9;
+      for (let f = 0; f < numFronds; f++) {
+        const frondAngle = (f / numFronds) * Math.PI * 2;
+        const frondPivot = new THREE.Group();
+        frondPivot.rotation.y = frondAngle;
+
+        const leafGeo = new THREE.PlaneGeometry(0.9 * scale, 3.8 * scale, 3, 8);
+        // Arch the leaf downward
+        const pos = leafGeo.attributes.position;
+        for (let p = 0; p < pos.count; p++) {
+          const yVal = pos.getY(p);
+          const arch = Math.pow((yVal + 1.9 * scale) / (3.8 * scale), 2) * -1.2 * scale;
+          pos.setZ(p, arch);
+        }
+        leafGeo.computeVertexNormals();
+
+        const leafMesh = new THREE.Mesh(leafGeo, leafMat);
+        leafMesh.position.set(0, 0, 1.8 * scale);
+        leafMesh.rotation.x = -Math.PI / 2.3;
+        leafMesh.castShadow = true;
+        frondPivot.add(leafMesh);
+        crown.add(frondPivot);
+      }
+
+      scene.add(treeGroup);
+    }
+
+    // Place Palm Trees around dunes and coastal hills
+    const palmLocations = [
+      { x: -24, z: -16, s: 1.1, c: 0.4 },
+      { x: 22, z: -18, s: 1.25, c: -0.3 },
+      { x: -26, z: 12, s: 0.95, c: 0.6 },
+      { x: 25, z: 10, s: 1.15, c: -0.5 },
+      { x: -12, z: -26, s: 1.05, c: 0.2 },
+      { x: 14, z: -27, s: 1.3, c: -0.4 },
+      { x: -16, z: 25, s: 1.1, c: 0.5 },
+      { x: 18, z: 24, s: 1.2, c: -0.3 },
+      { x: 17, z: -16, s: 1.35, c: -0.25 }, // Top of dune
+      { x: -18, z: 15, s: 1.2, c: 0.35 }    // Top of hill
+    ];
+    palmLocations.forEach(p => createPalmTree(p.x, p.z, p.s, p.c));
+
+    // Coastal Rocks around the shore and on hill slopes
+    const rockMat = new THREE.MeshStandardMaterial({ map: rockTexture, roughness: 0.85, metalness: 0.1 });
+    function placeCoastalRock(x, z, sx, sy, sz) {
+      const rockGeo = new THREE.DodecahedronGeometry(1.4, 1);
+      const rock = new THREE.Mesh(rockGeo, rockMat);
+      const gy = getTerrainHeight(x, z);
+      rock.position.set(x, gy + (sy * 0.4), z);
+      rock.scale.set(sx, sy, sz);
+      rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      scene.add(rock);
+    }
+    placeCoastalRock(-27, -5, 2.2, 1.3, 1.8);
+    placeCoastalRock(-25, 4, 1.6, 1.1, 1.5);
+    placeCoastalRock(28, -4, 2.4, 1.4, 2.0);
+    placeCoastalRock(26, 7, 1.8, 1.2, 1.6);
+    placeCoastalRock(0, -29, 2.5, 1.2, 2.1);
+    placeCoastalRock(6, -28, 1.7, 1.0, 1.5);
+    placeCoastalRock(-4, 28, 2.8, 1.3, 2.2);
+    placeCoastalRock(15, 14, 1.9, 1.4, 1.8); // Hill rock
+    placeCoastalRock(-14, -15, 2.1, 1.5, 1.9); // Dune rock
+
+    function createDetailedFighter(isYuji = true) {
+      const root = new THREE.Group();
+
+      const skinMat = new THREE.MeshStandardMaterial({ 
+        color: isYuji ? 0xf6c8aa : 0xdfd3ca, 
+        roughness: 0.55 
+      });
+      const uniformMat = new THREE.MeshStandardMaterial({
+        color: isYuji ? 0x111625 : 0x1a1c24,
+        roughness: 0.65
+      });
+      const beltMat = new THREE.MeshStandardMaterial({
+        color: 0x0a0c12,
+        roughness: 0.5
+      });
+      const shoeMat = new THREE.MeshStandardMaterial({
+        color: isYuji ? 0xb91c1c : 0x111625,
+        roughness: 0.5
+      });
+      const shoeSoleMat = new THREE.MeshStandardMaterial({
+        color: 0xe5e7eb,
+        roughness: 0.7
+      });
+      const hairMat = new THREE.MeshStandardMaterial({
+        color: isYuji ? 0xee7394 : 0x76889b,
+        roughness: 0.75
+      });
+      const hairDarkMat = new THREE.MeshStandardMaterial({
+        color: isYuji ? 0x24141c : 0x485869,
+        roughness: 0.8
+      });
+
+      // Pelvis / Hips
+      const pelvisGeo = new THREE.BoxGeometry(0.86, 0.44, 0.54);
+      const pelvis = new THREE.Mesh(pelvisGeo, uniformMat);
+      pelvis.castShadow = true;
+      pelvis.position.y = 1.6;
+      root.add(pelvis);
+
+      // Belt
+      const belt = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.1, 0.56), beltMat);
+      belt.position.y = 0.18;
+      pelvis.add(belt);
+
+      // Torso
+      const torsoGeo = new THREE.BoxGeometry(0.96, 0.98, 0.58);
+      const torso = new THREE.Mesh(torsoGeo, uniformMat);
+      torso.castShadow = true;
+      torso.position.y = 0.66;
+      pelvis.add(torso);
+
+      if (isYuji) {
+        // Red Hood Collar & Fold
+        const hoodCollarGeo = new THREE.BoxGeometry(0.78, 0.28, 0.64);
+        const hoodMat = new THREE.MeshStandardMaterial({ color: 0xba1818, roughness: 0.65 });
+        const hoodCollar = new THREE.Mesh(hoodCollarGeo, hoodMat);
+        hoodCollar.position.set(0, 0.44, 0.02);
+        torso.add(hoodCollar);
+
+        // Hanging Hood back pouch
+        const hoodBackGeo = new THREE.BoxGeometry(0.54, 0.4, 0.24);
+        const hoodBack = new THREE.Mesh(hoodBackGeo, hoodMat);
+        hoodBack.position.set(0, 0.32, -0.34);
+        hoodBack.rotation.x = -0.25;
+        torso.add(hoodBack);
+
+        // Gold Jujutsu High button
+        const buttonGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.06, 12);
+        const buttonMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.25 });
+        const button = new THREE.Mesh(buttonGeo, buttonMat);
+        button.rotation.x = Math.PI / 2;
+        button.position.set(0, 0.22, 0.31);
+        torso.add(button);
+      } else {
+        // Mahito's Stitches on Torso
+        const stitchMat = new THREE.MeshBasicMaterial({ color: 0x1f242d });
+        const bodyStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.025), stitchMat);
+        bodyStitchH.position.set(0.12, 0.1, 0.3);
+        torso.add(bodyStitchH);
+        for (let st = -2; st <= 2; st++) {
+          const cross = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.07), stitchMat);
+          cross.position.set(0.12 + st * 0.09, 0.1, 0.302);
+          torso.add(cross);
+        }
+      }
+
+      // Head Pivot & Head
+      const headPivot = new THREE.Group();
+      headPivot.position.y = 0.56;
+      torso.add(headPivot);
+
+      const headGeo = new THREE.BoxGeometry(0.56, 0.62, 0.56);
+      const head = new THREE.Mesh(headGeo, skinMat);
+      head.position.y = 0.33;
+      head.castShadow = true;
+      headPivot.add(head);
+
+      // Hair Base
+      const hairBaseGeo = new THREE.BoxGeometry(0.6, 0.28, 0.6);
+      const hairBase = new THREE.Mesh(hairBaseGeo, isYuji ? hairDarkMat : hairMat);
+      hairBase.position.y = 0.26;
+      head.add(hairBase);
+
+      if (isYuji) {
+        // Multi-point Yuji Two-Tone Spikes
+        const spikeGeo = new THREE.ConeGeometry(0.13, 0.34, 4);
+        for (let s = 0; s < 8; s++) {
+          const spike = new THREE.Mesh(spikeGeo, hairMat);
+          const sAng = (s / 8) * Math.PI * 2;
+          spike.position.set(Math.cos(sAng) * 0.23, 0.3, Math.sin(sAng) * 0.23);
+          spike.rotation.z = -Math.cos(sAng) * 0.42;
+          spike.rotation.x = Math.sin(sAng) * 0.42;
+          head.add(spike);
+        }
+      } else {
+        // Mahito's Messy Tendrils & Long Hair Tails
+        const tailGeo = new THREE.CylinderGeometry(0.08, 0.03, 0.75, 5);
+        const leftTail = new THREE.Mesh(tailGeo, hairMat);
+        leftTail.position.set(-0.24, -0.05, -0.22);
+        leftTail.rotation.set(-0.4, 0, -0.3);
+        head.add(leftTail);
+
+        const rightTail = new THREE.Mesh(tailGeo, hairMat);
+        rightTail.position.set(0.24, -0.05, -0.22);
+        rightTail.rotation.set(-0.4, 0, 0.3);
+        head.add(rightTail);
+      }
+
+      // Eyes
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+      const leftEye = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 0.045), eyeMat);
+      leftEye.position.set(-0.14, 0.06, 0.285);
+      head.add(leftEye);
+
+      const rightEye = leftEye.clone();
+      rightEye.position.x = 0.14;
+      head.add(rightEye);
+
+      if (isYuji) {
+        // Sukuna Eye Slits
+        const scarMat = new THREE.MeshBasicMaterial({ color: 0x580f1d });
+        const leftScar = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.025), scarMat);
+        leftScar.position.set(-0.14, -0.04, 0.286);
+        head.add(leftScar);
+        const rightScar = leftScar.clone();
+        rightScar.position.x = 0.14;
+        head.add(rightScar);
+      } else {
+        // Mahito Facial Stitching
+        const stitchFaceMat = new THREE.MeshBasicMaterial({ color: 0x2c3545 });
+        const faceStitch = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.02), stitchFaceMat);
+        faceStitch.position.set(0.02, 0.01, 0.286);
+        faceStitch.rotation.z = 0.32;
+        head.add(faceStitch);
+      }
+
+      const shoulderGeo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+      const upperArmGeo = new THREE.BoxGeometry(0.32, 0.54, 0.32);
+      const forearmGeo = new THREE.BoxGeometry(0.28, 0.5, 0.28);
+      const fistGeo = new THREE.BoxGeometry(0.26, 0.26, 0.28);
+
+      // Left Arm
+      const leftArmPivot = new THREE.Group();
+      leftArmPivot.position.set(-0.68, 0.35, 0);
+      const leftShoulder = new THREE.Mesh(shoulderGeo, uniformMat);
+      leftArmPivot.add(leftShoulder);
+
+      const leftUpperArm = new THREE.Mesh(upperArmGeo, uniformMat);
+      leftUpperArm.position.y = -0.3;
+      leftUpperArm.castShadow = true;
+      leftArmPivot.add(leftUpperArm);
+
+      const leftElbow = new THREE.Group();
+      leftElbow.position.y = -0.3;
+      leftUpperArm.add(leftElbow);
+
+      const leftForearm = new THREE.Mesh(forearmGeo, isYuji ? skinMat : uniformMat);
+      leftForearm.position.y = -0.3;
+      leftForearm.castShadow = true;
+      leftElbow.add(leftForearm);
+
+      if (isYuji) {
+        // Cuff
+        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.3), uniformMat);
+        cuff.position.y = -0.15;
+        leftForearm.add(cuff);
+      }
+
+      const leftFist = new THREE.Mesh(fistGeo, skinMat);
+      leftFist.position.y = -0.32;
+      leftForearm.add(leftFist);
+      torso.add(leftArmPivot);
+
+      // Right Arm
+      const rightArmPivot = new THREE.Group();
+      rightArmPivot.position.set(0.68, 0.35, 0);
+      const rightShoulder = new THREE.Mesh(shoulderGeo, uniformMat);
+      rightArmPivot.add(rightShoulder);
+
+      const rightUpperArm = new THREE.Mesh(upperArmGeo, uniformMat);
+      rightUpperArm.position.y = -0.3;
+      rightUpperArm.castShadow = true;
+      rightArmPivot.add(rightUpperArm);
+
+      const rightElbow = new THREE.Group();
+      rightElbow.position.y = -0.3;
+      rightUpperArm.add(rightElbow);
+
+      const rightForearm = new THREE.Mesh(forearmGeo, isYuji ? skinMat : uniformMat);
+      rightForearm.position.y = -0.3;
+      rightForearm.castShadow = true;
+      rightElbow.add(rightForearm);
+
+      if (isYuji) {
+        // Cuff
+        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.3), uniformMat);
+        cuff.position.y = -0.15;
+        rightForearm.add(cuff);
+      }
+
+      const rightFist = new THREE.Mesh(fistGeo, skinMat);
+      rightFist.position.y = -0.32;
+      rightForearm.add(rightFist);
+      torso.add(rightArmPivot);
+
+      // Legs with Cuffed Boots & Soles
+      const thighGeo = new THREE.BoxGeometry(0.36, 0.7, 0.36);
+      const calfGeo = new THREE.BoxGeometry(0.32, 0.65, 0.32);
+      const bootGeo = new THREE.BoxGeometry(0.36, 0.28, 0.48);
+      const soleGeo = new THREE.BoxGeometry(0.37, 0.06, 0.5);
+
+      // Left Leg
+      const leftLegPivot = new THREE.Group();
+      leftLegPivot.position.set(-0.26, -0.2, 0);
+      const leftThigh = new THREE.Mesh(thighGeo, uniformMat);
+      leftThigh.position.y = -0.35;
+      leftThigh.castShadow = true;
+      leftLegPivot.add(leftThigh);
+
+      const leftKnee = new THREE.Group();
+      leftKnee.position.y = -0.35;
+      leftThigh.add(leftKnee);
+
+      const leftCalf = new THREE.Mesh(calfGeo, uniformMat);
+      leftCalf.position.y = -0.32;
+      leftCalf.castShadow = true;
+      leftKnee.add(leftCalf);
+
+      const leftBoot = new THREE.Mesh(bootGeo, shoeMat);
+      leftBoot.position.set(0, -0.32, 0.06);
+      leftBoot.castShadow = true;
+      leftCalf.add(leftBoot);
+
+      const leftSole = new THREE.Mesh(soleGeo, shoeSoleMat);
+      leftSole.position.set(0, -0.16, 0);
+      leftBoot.add(leftSole);
+      pelvis.add(leftLegPivot);
+
+      // Right Leg
+      const rightLegPivot = new THREE.Group();
+      rightLegPivot.position.set(0.26, -0.2, 0);
+      const rightThigh = new THREE.Mesh(thighGeo, uniformMat);
+      rightThigh.position.y = -0.35;
+      rightThigh.castShadow = true;
+      rightLegPivot.add(rightThigh);
+
+      const rightKnee = new THREE.Group();
+      rightKnee.position.y = -0.35;
+      rightThigh.add(rightKnee);
+
+      const rightCalf = new THREE.Mesh(calfGeo, uniformMat);
+      rightCalf.position.y = -0.32;
+      rightCalf.castShadow = true;
+      rightKnee.add(rightCalf);
+
+      const rightBoot = new THREE.Mesh(bootGeo, shoeMat);
+      rightBoot.position.set(0, -0.32, 0.06);
+      rightBoot.castShadow = true;
+      rightCalf.add(rightBoot);
+
+      const rightSole = new THREE.Mesh(soleGeo, shoeSoleMat);
+      rightSole.position.set(0, -0.16, 0);
+      rightBoot.add(rightSole);
+      pelvis.add(rightLegPivot);
+
+      let auraMesh = null;
+      if (isYuji) {
+        const auraGeo = new THREE.SphereGeometry(0.38, 12, 12);
+        const auraMat = new THREE.MeshBasicMaterial({
+          color: 0xff002b,
+          transparent: true,
+          opacity: 0.0,
+          wireframe: true
+        });
+        auraMesh = new THREE.Mesh(auraGeo, auraMat);
+        rightFist.add(auraMesh);
+      }
+
+      return {
+        root: root,
+        pelvis: pelvis,
+        torso: torso,
+        head: head,
+        leftArmPivot: leftArmPivot,
+        rightArmPivot: rightArmPivot,
+        leftElbow: leftElbow,
+        rightElbow: rightElbow,
+        leftLegPivot: leftLegPivot,
+        rightLegPivot: rightLegPivot,
+        leftKnee: leftKnee,
+        rightKnee: rightKnee,
+        rightFist: rightFist,
+        leftFist: leftFist,
+        aura: auraMesh
+      };
+    }
+
+    const yuji = createDetailedFighter(true);
+    yuji.root.position.set(0, 0, 8);
+    scene.add(yuji.root);
+
+    const dummy = createDetailedFighter(false);
+    dummy.root.position.set(0, 0, -6);
+    scene.add(dummy.root);
+
+    const lightningGroup = new THREE.Group();
+    scene.add(lightningGroup);
+
+    const shockwaveGroup = new THREE.Group();
+    scene.add(shockwaveGroup);
+    const activeShockwaves = [];
+
+    const shockwaveGeo = new THREE.TorusGeometry(1, 0.09, 8, 28);
+    const shockwaveMat = new THREE.MeshBasicMaterial({ color: 0xff002b, transparent: true, opacity: 0.95 });
+
+    function spawnBlackFlashShockwave(originPos, scale = 1.0) {
+      const ring1 = new THREE.Mesh(shockwaveGeo, shockwaveMat.clone());
+      ring1.position.copy(originPos);
+      ring1.rotation.x = Math.PI / 2;
+      shockwaveGroup.add(ring1);
+
+      const ring2 = new THREE.Mesh(shockwaveGeo, new THREE.MeshBasicMaterial({ color: 0x050608, transparent: true, opacity: 0.9 }));
+      ring2.position.copy(originPos);
+      ring2.rotation.x = Math.PI / 2;
+      ring2.scale.set(0.7, 0.7, 0.7);
+      shockwaveGroup.add(ring2);
+
+      activeShockwaves.push({
+        mesh: ring1,
+        life: 0.45,
+        maxLife: 0.45,
+        growth: 28 * scale
+      });
+      activeShockwaves.push({
+        mesh: ring2,
+        life: 0.4,
+        maxLife: 0.4,
+        growth: 22 * scale
+      });
+    }
+
+    const lightningMaterials = [
+      new THREE.LineBasicMaterial({ color: 0x020204, linewidth: 3 }),
+      new THREE.LineBasicMaterial({ color: 0xff002b, linewidth: 2 }),
+      new THREE.LineBasicMaterial({ color: 0x88001b, linewidth: 2 }),
+    ];
+
+    const activeLightning = [];
+
+    function spawnBlackFlashLightning(originPos, scale = 1.0) {
+      spawnBlackFlashShockwave(originPos, scale);
+
+      for (let i = 0; i < 11; i++) {
+        const points = [];
+        let curr = originPos.clone();
+        points.push(curr.clone());
+
+        const dir = new THREE.Vector3(
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.2) * 2,
+          (Math.random() - 0.5) * 2
+        ).normalize();
+
+        const segments = 8 + Math.floor(Math.random() * 5);
+        const stepDist = (0.9 + Math.random() * 0.9) * scale;
+
+        for (let s = 0; s < segments; s++) {
+          curr.add(dir.clone().multiplyScalar(stepDist));
+          curr.x += (Math.random() - 0.5) * 1.3 * scale;
+          curr.y += (Math.random() - 0.5) * 1.3 * scale;
+          curr.z += (Math.random() - 0.5) * 1.3 * scale;
+          points.push(curr.clone());
+        }
+
+        const geo = new THREE.BufferGeometry().setFromPoints(points);
+        const mat = lightningMaterials[i % lightningMaterials.length];
+        const line = new THREE.Line(geo, mat);
+        lightningGroup.add(line);
+
+        activeLightning.push({
+          mesh: line,
+          life: 0.25 + Math.random() * 0.16,
+          maxLife: 0.41
+        });
+      }
+    }
+
+    const debrisGroup = new THREE.Group();
+    scene.add(debrisGroup);
+    const activeDebris = [];
+    const debrisGeo = new THREE.DodecahedronGeometry(0.24, 0);
+    const debrisMat = new THREE.MeshStandardMaterial({ color: 0xd4b476, roughness: 0.85 }); // Sandstone/sand chunks
+
+    function spawnDebris(pos, intensity = 14) {
+      for (let i = 0; i < intensity; i++) {
+        const chunk = new THREE.Mesh(debrisGeo, debrisMat);
+        chunk.position.copy(pos);
+        chunk.position.y = Math.max(0.1, chunk.position.y);
+        chunk.scale.setScalar(0.4 + Math.random() * 0.9);
+        debrisGroup.add(chunk);
+
+        const velocity = new THREE.Vector3(
+          (Math.random() - 0.5) * 16,
+          5 + Math.random() * 12,
+          (Math.random() - 0.5) * 16
+        );
+
+        activeDebris.push({
+          mesh: chunk,
+          vel: velocity,
+          rot: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8),
+          life: 1.6 + Math.random() * 0.6
+        });
+      }
+    }
+
+    const speedCanvas = document.getElementById('speed-lines-canvas');
+    const speedCtx = speedCanvas ? speedCanvas.getContext('2d') : null;
+    let speedLinesActive = false;
+
+    function renderSpeedLines() {
+      if (!speedCtx || !speedLinesActive) return;
+      const w = speedCanvas.width;
+      const h = speedCanvas.height;
+      speedCtx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const cy = h / 2;
+      const numLines = 36;
+      speedCtx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      speedCtx.lineWidth = 2.5;
+
+      for (let i = 0; i < numLines; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const innerR = Math.min(w, h) * (0.28 + Math.random() * 0.1);
+        const outerR = Math.max(w, h) * 0.75;
+        const x1 = cx + Math.cos(angle) * innerR;
+        const y1 = cy + Math.sin(angle) * innerR;
+        const x2 = cx + Math.cos(angle) * outerR;
+        const y2 = cy + Math.sin(angle) * outerR;
+
+        speedCtx.beginPath();
+        speedCtx.moveTo(x1, y1);
+        speedCtx.lineTo(x2, y2);
+        speedCtx.stroke();
+      }
+    }
+
+    const state = {
+      player: {
+        hp: 100,
+        maxHp: 100,
+        isDead: false,
+        respawnTimer: 0,
+        awakening: 0,
+        inZone: false,
+        zoneTimer: 0,
+        blackFlashStreak: 0,
+        chainWindowTimer: 0,
+        state: 'IDLE',
+        currentMove: null,
+        actionTimer: 0,
+        actionDuration: 0,
+        m1Step: 0,
+        lastM1Time: 0,
+        m1Lockout: 0, // 1.5s lockout after 4th M1 or downslam
+        pos: yuji.root.position,
+        vel: new THREE.Vector3(),
+        rotY: Math.PI,
+        speed: 15.5,
+        isBlocking: false,
+        isAirborne: false,
+        hasDownslamReady: false,
+        jumpFatigueCount: 0,
+        jumpFatigueTimer: 0,
+        dashDirection: 'FORWARD'
+      },
+      shiftLock: false,
+      cinematic: {
+        active: false,
+        timer: 0,
+        duration: 6.0,
+        heartbeatTimer: 0
+      },
+      dummy: {
+        hp: 100,
+        maxHp: 100,
+        isDead: false,
+        respawnTimer: 0,
+        state: 'IDLE',
+        timer: 0,
+        stunTimer: 0,
+        ragdollTimer: 0,
+        vel: new THREE.Vector3(),
+        rotY: 0,
+        mode: 'SANDBAG',
+        isBlocking: false,
+        attackTimer: 0,
+        attackDuration: 0,
+        attackPhase: 0,
+        walkCycle: 0,
+        isHeadInGround: false
+      },
+      cooldowns: {
+        skill1: 0,
+        skill2: 0,
+        skill3: 0,
+        skill4: 0,
+        dash: 0,
+        m1Delay: 0
+      },
+      camera: {
+        yaw: 0,
+        pitch: 0.28,
+        dist: 7.5,
+        targetOffset: new THREE.Vector3(0, 1.8, 0),
+        shake: 0
+      },
+      hitstop: 0
+    };
+
+    function updatePlayerUI() {
+      const hpPct = Math.max(0, (state.player.hp / state.player.maxHp) * 100);
+      const hpBar = document.getElementById('player-hp-bar');
+      const hpNum = document.getElementById('player-hp-num');
+      if (hpBar) hpBar.style.width = hpPct + '%';
+      if (hpNum) hpNum.innerText = `${Math.round(state.player.hp)} / 100`;
+    }
+
+    function updateEnemyUI() {
+      const hpPct = Math.max(0, (state.dummy.hp / state.dummy.maxHp) * 100);
+      const hpBar = document.getElementById('enemy-hp-bar');
+      const hpNum = document.getElementById('enemy-hp-num');
+      if (hpBar) hpBar.style.width = hpPct + '%';
+      if (hpNum) hpNum.innerText = Math.round(hpPct) + '%';
+
+      const ragdollTag = document.getElementById('enemy-ragdoll-tag');
+      if (ragdollTag) {
+        if (state.dummy.state === 'RAGDOLL' || state.dummy.isHeadInGround) {
+          ragdollTag.classList.remove('hidden');
+        } else {
+          ragdollTag.classList.add('hidden');
+        }
+      }
+
+      const stunTag = document.getElementById('enemy-stun-tag');
+      if (stunTag) {
+        if (state.dummy.stunTimer > 0 && state.dummy.state !== 'RAGDOLL' && !state.dummy.isHeadInGround) {
+          stunTag.classList.remove('hidden');
+        } else {
+          stunTag.classList.add('hidden');
+        }
+      }
+    }
+
+    function addAwakeningGauge(amt) {
+      if (state.player.inZone || state.player.isDead) return;
+      state.player.awakening = Math.min(100, state.player.awakening + amt);
+      updateAwakeningUI();
+    }
+
+    function updateAwakeningUI() {
+      const bar = document.getElementById('awakening-bar');
+      const pctText = document.getElementById('awakening-pct');
+      const awakenBtn = document.getElementById('btn-awaken');
+      const awakenLabel = document.getElementById('label-awaken');
+      const awakenSub = document.getElementById('sub-awaken');
+
+      if (!bar || !pctText || !awakenBtn) return;
+
+      if (state.player.inZone) {
+        const timeFraction = Math.max(0, state.player.zoneTimer / 30.0);
+        const timePct = timeFraction * 100;
+        bar.style.width = timePct + '%';
+        bar.className = 'h-full bg-gradient-to-r from-red-600 to-amber-400 rounded-full transition-all duration-75 shadow-[0_0_10px_#ef4444]';
+        pctText.innerText = `${state.player.zoneTimer.toFixed(1)}s`;
+        if (awakenSub) awakenSub.innerText = `${state.player.zoneTimer.toFixed(1)}s`;
+      } else {
+        const gauge = state.player.awakening;
+        bar.style.width = gauge + '%';
+        bar.className = 'h-full bg-gradient-to-r from-yellow-500 via-amber-400 to-red-500 rounded-full transition-all duration-100 shadow-[0_0_8px_#f59e0b]';
+        pctText.innerText = `${Math.round(gauge)}%`;
+        if (awakenSub) awakenSub.innerText = `${Math.round(gauge)}%`;
+
+        if (gauge >= 100) {
+          awakenBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+          awakenBtn.classList.add('ult-ready-anim');
+          if (awakenLabel) {
+            awakenLabel.innerText = 'AWAKEN';
+            awakenLabel.className = 'text-[8px] sm:text-[9px] font-black text-yellow-300 combat-font text-center leading-none drop-shadow-[0_0_8px_#f59e0b]';
+          }
+        } else {
+          awakenBtn.classList.add('opacity-40', 'cursor-not-allowed');
+          awakenBtn.classList.remove('ult-ready-anim', 'ult-active-anim');
+          if (awakenLabel) {
+            awakenLabel.innerText = 'LOCKED';
+            awakenLabel.className = 'text-[8px] sm:text-[9px] font-black text-gray-400 combat-font text-center leading-none';
+          }
+        }
+      }
+    }
+
+    function toggleShiftLock() {
+      state.shiftLock = !state.shiftLock;
+      const btn = document.getElementById('label-shiftlock');
+      const crosshair = document.getElementById('crosshair-el');
+      const bL = document.getElementById('reticle-bracket-l');
+      const bR = document.getElementById('reticle-bracket-r');
+
+      if (state.shiftLock) {
+        document.body.classList.add('shift-lock-cursor-hidden');
+        try {
+          if (document.body.requestPointerLock && !('ontouchstart' in window)) {
+            document.body.requestPointerLock();
+          }
+        } catch (e) {}
+
+        if (btn) {
+          btn.innerText = 'LOCK ON';
+          btn.parentElement.classList.add('border-cyan-400', 'shadow-[0_0_10px_#00f0ff]');
+        }
+        if (crosshair) crosshair.classList.add('shift-lock-active');
+        if (bL) bL.classList.remove('hidden');
+        if (bR) bR.classList.remove('hidden');
+        showHitBanner("SHIFT LOCK: ENABLED");
+      } else {
+        document.body.classList.remove('shift-lock-cursor-hidden');
+        try {
+          if (document.exitPointerLock && document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+        } catch (e) {}
+
+        if (btn) {
+          btn.innerText = 'LOCK OFF';
+          btn.parentElement.classList.remove('border-cyan-400', 'shadow-[0_0_10px_#00f0ff]');
+        }
+        if (crosshair) crosshair.classList.remove('shift-lock-active');
+        if (bL) bL.classList.add('hidden');
+        if (bR) bR.classList.add('hidden');
+        showHitBanner("SHIFT LOCK: DISABLED");
+      }
+    }
+
+    function updateHotbarLabels() {
+      const l1 = document.getElementById('label-skill-1');
+      const l2 = document.getElementById('label-skill-2');
+      const l3 = document.getElementById('label-skill-3');
+      const l4 = document.getElementById('label-skill-4');
+      const sub4 = document.getElementById('sub-skill-4');
+
+      if (state.player.inZone) {
+        if (l1) l1.innerText = 'DISMANTLE';
+        if (l2) l2.innerText = 'PIERCING';
+        if (l3) l3.innerText = 'CLEAVE';
+        if (l4) l4.innerText = 'BARRAGE';
+        if (sub4) sub4.innerText = '4 DMG x8';
+      } else {
+        if (l1) l1.innerText = 'DIVERGENT';
+        if (l2) l2.innerText = 'MANJI';
+        if (l3) l3.innerText = 'DROPKICK';
+        if (l4) l4.innerText = 'BLACK FLASH';
+        if (sub4) sub4.innerText = '1s CHAIN';
+      }
+    }
+
+    function showHitBanner(text) {
+      const banner = document.getElementById('combo-hit-banner');
+      const bannerText = document.getElementById('combo-hit-text');
+      if (!banner || !bannerText) return;
+      bannerText.innerText = text;
+      banner.style.opacity = '1';
+      clearTimeout(banner.hideTimeout);
+      banner.hideTimeout = setTimeout(() => {
+        banner.style.opacity = '0';
+      }, 1400);
+    }
+
+    function triggerAnimeImpactFrame() {
+      const overlay = document.getElementById('impact-overlay');
+      if (!overlay) return;
+      overlay.style.backgroundColor = '#ffffff';
+      overlay.style.opacity = '0.96';
+      document.body.classList.add('impact-invert');
+
+      if (speedCanvas) {
+        speedLinesActive = true;
+        speedCanvas.style.opacity = '0.9';
+        renderSpeedLines();
+      }
+
+      setTimeout(() => {
+        overlay.style.backgroundColor = '#b91c1c';
+        overlay.style.opacity = '0.6';
+        document.body.classList.remove('impact-invert');
+        document.body.classList.add('impact-crimson');
+      }, 60);
+
+      setTimeout(() => {
+        overlay.style.opacity = '0';
+        document.body.classList.remove('impact-crimson');
+        if (speedCanvas) {
+          speedLinesActive = false;
+          speedCanvas.style.opacity = '0';
+        }
+      }, 180);
+    }
+
+    function triggerScreenShake(magnitude) {
+      state.camera.shake = Math.max(state.camera.shake, magnitude);
+    }
+
+    function showChainIndicator(show, remainingTime = 1.0) {
+      const el = document.getElementById('chain-window-indicator');
+      const lbl = document.getElementById('chain-timer-label');
+      if (el) el.style.opacity = show ? '1' : '0';
+      if (lbl && show) lbl.innerText = `CHAIN ACTIVE: ${remainingTime.toFixed(1)}s REMAINING`;
+    }
+
+    function updateBlackFlashStreakUI(streak) {
+      const container = document.getElementById('bf-chain-container');
+      const countNum = document.getElementById('bf-count-num');
+      const tierTitle = document.getElementById('bf-tier-title');
+      if (!container || !countNum) return;
+
+      countNum.innerText = streak;
+      const titles = [
+        "SPATIAL DISTORTION!",
+        "CURSED ENERGY ESSENCE!",
+        "BEYOND HUMAN THRESHOLD!",
+        "CONSECUTIVE KOKUSEN!",
+        "UNPRECEDENTED ANOMALY!",
+        "DIVINE CONCENTRATION!"
+      ];
+      if (tierTitle) tierTitle.innerText = titles[Math.min(streak - 1, titles.length - 1)];
+
+      container.style.opacity = '1';
+      container.style.transform = 'translate(0px, 0)';
+    }
+
+    function resetBlackFlashStreak() {
+      state.player.blackFlashStreak = 0;
+      state.player.chainWindowTimer = 0;
+      showChainIndicator(false);
+      const container = document.getElementById('bf-chain-container');
+      if (container) {
+        container.style.opacity = '0';
+        container.style.transform = 'translate(-30px, 0)';
+      }
+    }
+
+    function updateM1Dots(step) {
+      const dotsWrapper = document.getElementById('m1-step-dots');
+      if (!dotsWrapper) return;
+      const dots = dotsWrapper.children;
+      for (let i = 0; i < 4; i++) {
+        if (dots[i]) {
+          dots[i].className = i < step
+            ? 'w-1 h-1 rounded-full bg-red-500 shadow-[0_0_6px_#ef4444]'
+            : 'w-1 h-1 rounded-full bg-gray-700';
+        }
+      }
+    }
+
+    function tryActivateTheZone() {
+      if (state.player.inZone || state.cinematic.active || state.player.isDead) return;
+
+      if (state.player.awakening < 100) {
+        showHitBanner(`ULTIMATE NOT READY! (${Math.round(state.player.awakening)}% / 100%)`);
+        return;
+      }
+
+      state.cinematic.active = true;
+      state.cinematic.timer = 6.0;
+      state.cinematic.heartbeatTimer = 0.4;
+
+      state.player.state = 'CINEMATIC';
+      state.player.vel.set(0, 0, 0);
+
+      document.body.classList.add('cinematic-active');
+      const hud = document.getElementById('game-hud-wrapper');
+      if (hud) hud.classList.add('hud-hidden');
+      const cross = document.getElementById('crosshair-el');
+      if (cross) cross.style.opacity = '0';
+      const joy = document.getElementById('mobile-controls');
+      if (joy) {
+        joy.style.opacity = '0';
+        joy.style.pointerEvents = 'none';
+      }
+
+      const titleBox = document.getElementById('cinematic-title-box');
+      const subText = document.getElementById('cinematic-sub-text');
+      if (subText) subText.innerText = "DIVERGENT HARMONY";
+      if (titleBox) titleBox.style.opacity = '1';
+
+      if (cinematicDrone) cinematicDrone.triggerAttack('D1');
+      if (heartbeatSynth) heartbeatSynth.triggerAttackRelease('C1', '8n');
+      triggerScreenShake(0.35);
+    }
+
+    function completeCinematicAwakening() {
+      state.cinematic.active = false;
+      state.cinematic.timer = 0;
+
+      state.player.state = 'IDLE';
+      state.player.inZone = true;
+      state.player.zoneTimer = 30.0;
+      updateHotbarLabels();
+
+      document.body.classList.remove('cinematic-active');
+      const hud = document.getElementById('game-hud-wrapper');
+      if (hud) hud.classList.remove('hud-hidden');
+      const cross = document.getElementById('crosshair-el');
+      if (cross) cross.style.opacity = '1';
+      const joy = document.getElementById('mobile-controls');
+      if (joy) {
+        joy.style.opacity = '1';
+        joy.style.pointerEvents = 'auto';
+      }
+      const titleBox = document.getElementById('cinematic-title-box');
+      if (titleBox) titleBox.style.opacity = '0';
+
+      playAwakenSound();
+      startAwakeningOST();
+      triggerScreenShake(1.4);
+      triggerAnimeImpactFrame();
+      spawnBlackFlashLightning(yuji.root.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 3.2);
+
+      const zoneBadge = document.getElementById('zone-badge');
+      if (zoneBadge) zoneBadge.classList.remove('hidden');
+      const zoneOverlay = document.getElementById('zone-overlay');
+      if (zoneOverlay) zoneOverlay.className = 'absolute inset-0 pointer-events-none z-20 opacity-100 transition-opacity duration-300 awakened-vignette';
+
+      const awakenBtn = document.getElementById('btn-awaken');
+      if (awakenBtn) {
+        awakenBtn.classList.remove('ult-ready-anim', 'opacity-40', 'cursor-not-allowed');
+        awakenBtn.classList.add('ult-active-anim');
+      }
+      const lbl = document.getElementById('label-awaken');
+      if (lbl) lbl.innerText = 'AWAKENED';
+      const sub = document.getElementById('sub-awaken');
+      if (sub) sub.innerText = '30.0s';
+      const uLbl = document.getElementById('ult-label');
+      if (uLbl) uLbl.innerText = 'TIME';
+
+      showHitBanner("120% POTENTIAL AWAKENED! 30s COUNTDOWN ACTIVE!");
+    }
+
+    function deactivateTheZone() {
+      state.player.inZone = false;
+      state.player.zoneTimer = 0;
+      state.player.awakening = 0;
+      stopAwakeningOST();
+      updateHotbarLabels();
+      updateAwakeningUI();
+
+      const zoneBadge = document.getElementById('zone-badge');
+      if (zoneBadge) zoneBadge.classList.add('hidden');
+      const zoneOverlay = document.getElementById('zone-overlay');
+      if (zoneOverlay) zoneOverlay.style.opacity = '0';
+
+      const awakenBtn = document.getElementById('btn-awaken');
+      if (awakenBtn) {
+        awakenBtn.classList.remove('ult-active-anim', 'ult-ready-anim');
+        awakenBtn.classList.add('opacity-40', 'cursor-not-allowed');
+      }
+      const lbl = document.getElementById('label-awaken');
+      if (lbl) lbl.innerText = 'LOCKED';
+      const sub = document.getElementById('sub-awaken');
+      if (sub) sub.innerText = '0%';
+      const uLbl = document.getElementById('ult-label');
+      if (uLbl) uLbl.innerText = 'ULT';
+
+      showHitBanner("AWAKENING EXPIRED (BASE MOVES RESTORED)");
+    }
+
+    function applyDamageToDummy(dmg, hitType, isUnblockable = false) {
+      if (state.dummy.isDead) return false;
+
+      // KNOCKDOWN PROTECTION: Downed enemies laying flat on the floor cannot be hit!
+      if (state.dummy.state === 'RAGDOLL' || state.dummy.isHeadInGround) {
+        showHitBanner("OPPONENT IS DOWNED! (INVULNERABLE)");
+        return false;
+      }
+
+      // Behind check: Guard only protects frontal arc. Behind attacks break block!
+      const victimFacing = new THREE.Vector3(Math.sin(state.dummy.rotY), 0, Math.cos(state.dummy.rotY)).normalize();
+      const toAttacker = yuji.root.position.clone().sub(dummy.root.position).setY(0).normalize();
+      const dot = victimFacing.dot(toAttacker);
+      const isFromBehind = dot < -0.2; // Attacker is behind victim
+
+      if (state.dummy.isBlocking && !isUnblockable) {
+        if (isFromBehind) {
+          // Block Broken!
+          state.dummy.isBlocking = false;
+          state.dummy.stunTimer = 0.9;
+          triggerAnimeImpactFrame();
+          triggerScreenShake(0.35);
+          showHitBanner("GUARD BROKEN FROM BEHIND! CRITICAL HIT!");
+        } else {
+          // Blocked: 0 DMG, 0 Ult gained, no stun!
+          playPunchSound(false);
+          triggerScreenShake(0.08);
+          showHitBanner("BLOCKED! 0 DMG (0 ULT)");
+          return false;
+        }
+      }
+
+      // Unblocked or broken hit
+      state.dummy.hp = Math.max(0, state.dummy.hp - dmg);
+      updateEnemyUI();
+      state.dummy.stunTimer = 0.7; // 0.7s hitstun
+      state.dummy.isBlocking = false;
+
+      const pushDir = dummy.root.position.clone().sub(yuji.root.position);
+      pushDir.y = 0;
+      pushDir.normalize();
+
+      if (hitType === 'FAR_LAUNCH') {
+        state.dummy.state = 'RAGDOLL';
+        state.dummy.ragdollTimer = 1.6;
+        state.dummy.vel.copy(pushDir.multiplyScalar(44));
+        state.dummy.vel.y = 11;
+      } else if (hitType === 'BLACK_FLASH_LAUNCH') {
+        state.dummy.state = 'RAGDOLL';
+        state.dummy.ragdollTimer = 1.1;
+        state.dummy.vel.copy(pushDir.multiplyScalar(15));
+        state.dummy.vel.y = 3.2;
+      } else if (hitType === 'DOWN_SLAM') {
+        state.dummy.state = 'RAGDOLL';
+        state.dummy.ragdollTimer = 1.5; // Lays down for 1.5s (INVULNERABLE)
+        state.dummy.vel.set(0, 0, 0);   // Stop movement immediately
+        dummy.root.position.y = 0;      // Snap directly to the floor instantly
+        dummy.pelvis.position.y = 0.22;
+        dummy.pelvis.rotation.set(-Math.PI / 2, 0, 0);
+      } else if (hitType === 'DROPKICK_LAUNCH') {
+        state.dummy.state = 'LAUNCHED_BACK';
+        state.dummy.ragdollTimer = 1.4;
+        state.dummy.vel.copy(pushDir.multiplyScalar(38));
+        state.dummy.vel.y = 9;
+      } else {
+        state.dummy.vel.add(pushDir.multiplyScalar(6));
+      }
+
+      if (state.dummy.hp <= 0) {
+        triggerDummyDeath(hitType === 'BLACK_FLASH_LAUNCH' || hitType === 'FAR_LAUNCH');
+      }
+
+      return true;
+    }
+
+    function triggerDummyDeath(explodeWithBlackFlash = false) {
+      if (state.dummy.isDead) return;
+      state.dummy.isDead = true;
+      state.dummy.respawnTimer = 2.0;
+      state.dummy.state = 'DEAD';
+      state.dummy.vel.set(0, 0, 0);
+
+      if (explodeWithBlackFlash) {
+        spawnBlackFlashLightning(dummy.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 2.5);
+        spawnDebris(dummy.root.position, 24);
+        triggerScreenShake(1.2);
+        showHitBanner("KOKUSEN DEFEAT COLLAPSE!!");
+      } else {
+        showHitBanner("MAHITO COLLAPSED (RESPAWNING IN 2s)");
+      }
+    }
+
+    function triggerPlayerDeath() {
+      if (state.player.isDead) return;
+      state.player.isDead = true;
+      state.player.hp = 0;
+      state.player.respawnTimer = 2.0;
+      state.player.state = 'DEAD';
+      state.player.vel.set(0, 0, 0);
+      updatePlayerUI();
+      showHitBanner("YOU COLLAPSED (RESPAWNING IN 2s)");
+    }
+
+    function respawnPlayer() {
+      state.player.hp = 100;
+      state.player.isDead = false;
+      state.player.respawnTimer = 0;
+      state.player.state = 'IDLE';
+      state.player.vel.set(0, 0, 0);
+      yuji.root.position.set(0, 0, 8);
+      yuji.torso.rotation.set(0, 0, 0);
+      updatePlayerUI();
+      showHitBanner("YUJI RESPAWNED");
+    }
+
+    function respawnDummy() {
+      state.dummy.hp = 100;
+      state.dummy.isDead = false;
+      state.dummy.isHeadInGround = false;
+      state.dummy.respawnTimer = 0;
+      state.dummy.state = 'IDLE';
+      state.dummy.stunTimer = 0;
+      state.dummy.ragdollTimer = 0;
+      state.dummy.vel.set(0, 0, 0);
+      dummy.root.position.set(0, 0, -6);
+      dummy.pelvis.position.y = 1.6;
+      dummy.pelvis.rotation.set(0, 0, 0);
+      dummy.torso.rotation.set(0, 0, 0);
+      updateEnemyUI();
+      showHitBanner("MAHITO RESPAWNED");
+    }
+
+    function updateDummyAI(dt) {
+      if (state.dummy.isDead) {
+        state.dummy.respawnTimer -= dt;
+        if (state.dummy.respawnTimer <= 0) {
+          respawnDummy();
+        }
+        return;
+      }
+
+      if (state.dummy.stunTimer > 0) {
+        state.dummy.stunTimer -= dt;
+        return;
+      }
+      if (state.dummy.state === 'RAGDOLL' || state.dummy.state === 'LAUNCHED_BACK') {
+        state.dummy.ragdollTimer -= dt;
+        // Fix: Removed the restrictive 'y <= 0.05' check so fighters get up anywhere on sand hills/dunes
+        if (state.dummy.ragdollTimer <= 0) {
+          state.dummy.state = 'IDLE';
+          state.dummy.isHeadInGround = false;
+          dummy.pelvis.position.y = 1.6;
+          dummy.pelvis.rotation.set(0, 0, 0);
+          dummy.torso.rotation.set(0, 0, 0);
+          dummy.head.rotation.set(0, 0, 0);
+          dummy.head.position.set(0, 0.33, 0);
+          dummy.leftLegPivot.rotation.set(0, 0, 0);
+          dummy.rightLegPivot.rotation.set(0, 0, 0);
+          dummy.leftArmPivot.rotation.set(0, 0, 0);
+          dummy.rightArmPivot.rotation.set(0, 0, 0);
+          dummy.leftElbow.rotation.set(0, 0, 0);
+          dummy.rightElbow.rotation.set(0, 0, 0);
+          dummy.leftKnee.rotation.set(0, 0, 0);
+          dummy.rightKnee.rotation.set(0, 0, 0);
+        }
+        return;
+      }
+
+      if (state.dummy.attackTimer > 0) {
+        state.dummy.attackTimer -= dt;
+        if (state.dummy.attackTimer <= 0) {
+          state.dummy.state = 'IDLE';
+        }
+      }
+
+      const toPlayer = yuji.root.position.clone().sub(dummy.root.position);
+      const dist = toPlayer.length();
+      toPlayer.y = 0;
+      toPlayer.normalize();
+
+      state.dummy.rotY = Math.atan2(toPlayer.x, toPlayer.z);
+      dummy.root.rotation.y = state.dummy.rotY;
+
+      if (state.dummy.mode === 'SANDBAG') {
+        state.dummy.isBlocking = false;
+        return;
+      }
+
+      state.dummy.timer -= dt;
+      if (state.dummy.mode === 'DEFENSIVE') {
+        state.dummy.isBlocking = true;
+      } else if (state.dummy.mode === 'AGGRESSIVE') {
+        state.dummy.isBlocking = false;
+
+        if (dist > 3.2 && state.dummy.state !== 'ATTACKING') {
+          state.dummy.vel.x += toPlayer.x * 9.5 * dt * 8;
+          state.dummy.vel.z += toPlayer.z * 9.5 * dt * 8;
+          state.dummy.walkCycle += dt * 14;
+        }
+
+        if (dist <= 3.8 && state.dummy.timer <= 0 && state.dummy.state !== 'ATTACKING' && !state.player.isDead) {
+          state.dummy.timer = 1.1 + Math.random() * 0.9;
+          state.dummy.state = 'ATTACKING';
+          state.dummy.attackPhase = (state.dummy.attackPhase % 2) + 1;
+          state.dummy.attackDuration = 0.42;
+          state.dummy.attackTimer = 0.42;
+
+          setTimeout(() => {
+            const currentDist = yuji.root.position.distanceTo(dummy.root.position);
+            if (currentDist < 4.2 && state.player.state !== 'CINEMATIC' && !state.player.isDead) {
+              if (state.player.isBlocking) {
+                playPunchSound(false);
+                triggerScreenShake(0.12);
+                showHitBanner("PLAYER BLOCKED ATTACK!");
+                addAwakeningGauge(3);
+              } else {
+                playPunchSound(true);
+                state.player.hp = Math.max(0, state.player.hp - 12);
+                updatePlayerUI();
+                triggerScreenShake(0.35);
+                spawnDebris(yuji.root.position, 6);
+                addAwakeningGauge(6);
+                showHitBanner("MAHITO SOUL STRIKE!");
+                if (state.player.hp <= 0) triggerPlayerDeath();
+              }
+            }
+          }, 180);
+        }
+      }
+    }
+
+    function executeJump() {
+      if (state.player.state !== 'IDLE' && state.player.state !== 'ATTACKING') return;
+      if (state.player.isAirborne || state.cinematic.active || state.player.isDead) return;
+
+      state.player.isAirborne = true;
+      const jumpPower = Math.max(4.0, 9.2 - state.player.jumpFatigueCount * 1.8);
+      state.player.vel.y = jumpPower;
+      state.player.jumpFatigueCount++;
+      state.player.jumpFatigueTimer = 1.5;
+
+      playDodgeSound();
+
+      if (state.player.m1Step >= 3) {
+        state.player.hasDownslamReady = true;
+        showHitBanner("DOWNSLAM PRIMED IN AIR!");
+      }
+    }
+
+    function executeM1() {
+      if (state.player.isDead || state.player.isBlocking || state.cinematic.active) return;
+      if (state.player.m1Lockout > 0) {
+        showHitBanner(`M1 RECOVERING: ${state.player.m1Lockout.toFixed(1)}s`);
+        return;
+      }
+      if (state.cooldowns.m1Delay > 0) {
+        return;
+      }
+      if (state.player.state !== 'IDLE' && state.player.state !== 'ATTACKING') return;
+
+      const now = performance.now();
+      if (now - state.player.lastM1Time > 900) {
+        state.player.m1Step = 0;
+      }
+
+      // Check for Aerial Jump Downslam
+      if (state.player.isAirborne && state.player.hasDownslamReady) {
+        state.player.hasDownslamReady = false;
+        state.player.m1Step = 0;
+        state.player.m1Lockout = 1.5;
+        state.cooldowns.m1Delay = 0.5;
+        updateM1Dots(0);
+
+        state.player.state = 'ATTACKING';
+        state.player.currentMove = 'DOWNSLAM_FINISHER';
+        state.player.actionDuration = 0.5;
+        state.player.actionTimer = 0.5;
+        state.player.vel.y = -35;
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 5.8) {
+          triggerAnimeImpactFrame();
+          triggerScreenShake(0.7);
+          spawnDebris(dummy.root.position, 18);
+          playPunchSound(true);
+          const cleanHit = applyDamageToDummy(14, 'DOWN_SLAM', false);
+          if (cleanHit) addAwakeningGauge(8);
+          showHitBanner("AERIAL DOWNSLAM FINISHER!!");
+        }
+        return;
+      }
+
+      state.player.m1Step = (state.player.m1Step % 4) + 1;
+      state.player.lastM1Time = now;
+      state.cooldowns.m1Delay = 0.5; // Strict 0.5s cadence delay between each M1
+      updateM1Dots(state.player.m1Step);
+
+      const isHeavy = (state.player.m1Step === 4);
+      if (isHeavy) {
+        state.player.m1Lockout = 1.5; // 1.5s combo lockout after 4th M1
+      }
+
+      state.player.state = 'ATTACKING';
+      state.player.currentMove = 'M1';
+      state.player.actionDuration = 0.32;
+      state.player.actionTimer = 0.32;
+
+      if (!state.shiftLock) {
+        const toDummy = dummy.root.position.clone().sub(yuji.root.position);
+        toDummy.y = 0;
+        if (toDummy.length() < 7) {
+          state.player.rotY = Math.atan2(toDummy.x, toDummy.z);
+        }
+      }
+
+      const forward = new THREE.Vector3(Math.sin(state.player.rotY), 0, Math.cos(state.player.rotY));
+      state.player.vel.add(forward.multiplyScalar(6.5));
+
+      playPunchSound(isHeavy);
+
+      const dist = yuji.root.position.distanceTo(dummy.root.position);
+      if (dist < 4.5) {
+        // Prevent hitting downed enemies laying on the ground
+        if (state.dummy.state === 'RAGDOLL' || state.dummy.isHeadInGround) {
+          showHitBanner("CANNOT M1 DOWNED ENEMY!");
+          return;
+        }
+
+        triggerScreenShake(isHeavy ? 0.38 : 0.16);
+        spawnDebris(dummy.root.position, isHeavy ? 12 : 5);
+        const dmg = isHeavy ? 12 : 4;
+        const cleanHit = applyDamageToDummy(dmg, isHeavy ? 'FAR_LAUNCH' : 'NORMAL', false);
+        if (cleanHit) addAwakeningGauge(isHeavy ? 6 : 3);
+        showHitBanner(isHeavy ? "4TH HIT KNOCKBACK! (1.5s RECOVERY)" : `PUNCH ${state.player.m1Step}`);
+      }
+    }
+
+    // Move 1: Divergent Fist (6s CD / 7 DMG) / Ult: Soul Dismantle (8s CD / 15 DMG)
+    function triggerMove1() {
+      if (state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
+      if (state.cooldowns.skill1 > 0) return;
+
+      state.player.state = 'ATTACKING';
+
+      if (!state.shiftLock) {
+        const toDummy = dummy.root.position.clone().sub(yuji.root.position);
+        toDummy.y = 0;
+        state.player.rotY = Math.atan2(toDummy.x, toDummy.z);
+      }
+      const forward = new THREE.Vector3(Math.sin(state.player.rotY), 0, Math.cos(state.player.rotY));
+
+      if (state.player.inZone) {
+        state.cooldowns.skill1 = 8.0;
+        state.player.actionDuration = 0.55;
+        state.player.actionTimer = 0.55;
+        state.player.currentMove = 'SOUL_DISMANTLE';
+        state.player.vel.add(forward.multiplyScalar(22));
+        if (slashSynth) slashSynth.triggerAttackRelease('16n');
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 5.8) {
+          triggerAnimeImpactFrame();
+          triggerScreenShake(0.65);
+          spawnDebris(dummy.root.position, 14);
+          applyDamageToDummy(15, 'SOUL_DISMANTLE', true);
+          showHitBanner("SOUL DISMANTLE SLASH (15 DMG)!");
+        }
+      } else {
+        state.cooldowns.skill1 = 6.0;
+        state.player.actionDuration = 0.45;
+        state.player.actionTimer = 0.45;
+        state.player.currentMove = 'DIVERGENT';
+        state.player.vel.add(forward.multiplyScalar(15));
+        playPunchSound(false);
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 5.0) {
+          const isFinisherTarget = (state.dummy.hp < 15);
+          const cleanHit = applyDamageToDummy(7, 'NORMAL', false);
+
+          if (cleanHit) {
+            addAwakeningGauge(8);
+            showHitBanner("DIVERGENT STRIKE (7 DMG)!");
+
+            if (isFinisherTarget) {
+              state.player.state = 'ATTACKING';
+              state.player.currentMove = 'DOWNSLAM_FINISHER';
+              state.player.actionDuration = 0.95;
+              state.player.actionTimer = 0.95;
+
+              state.player.vel.set(0, 16, 0);
+              state.dummy.vel.set(0, 16, 0);
+              state.dummy.state = 'RAGDOLL';
+
+              setTimeout(() => {
+                state.player.vel.set(0, -30, 0);
+                state.dummy.vel.set(0, -32, 0);
+                playPunchSound(true);
+                triggerAnimeImpactFrame();
+                triggerScreenShake(0.9);
+                spawnDebris(dummy.root.position, 22);
+                applyDamageToDummy(10, 'DOWN_SLAM', true);
+                state.dummy.isHeadInGround = true;
+                showHitBanner("HEAD-IN-GROUND DOWNSLAM FINISHER!!");
+              }, 340);
+            }
+          }
+        }
+      }
+    }
+
+    // Move 2: Manji Kick (7s CD / 9 DMG) / Ult: Piercing Blood (8s CD / 15 DMG)
+    function triggerMove2() {
+      if (state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
+      if (state.cooldowns.skill2 > 0) return;
+
+      state.player.state = 'ATTACKING';
+
+      if (!state.shiftLock) {
+        const toDummy = dummy.root.position.clone().sub(yuji.root.position);
+        toDummy.y = 0;
+        state.player.rotY = Math.atan2(toDummy.x, toDummy.z);
+      }
+      const forward = new THREE.Vector3(Math.sin(state.player.rotY), 0, Math.cos(state.player.rotY));
+
+      if (state.player.inZone) {
+        state.cooldowns.skill2 = 8.0;
+        state.player.actionDuration = 0.6;
+        state.player.actionTimer = 0.6;
+        state.player.currentMove = 'PIERCING_BLOOD';
+        state.player.vel.set(0, 0, 0);
+
+        bloodBeam.visible = true;
+        bloodBeam.position.copy(yuji.root.position).add(new THREE.Vector3(0, 1.4, 0));
+        bloodBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward);
+        bloodBeam.material.opacity = 1;
+        triggerScreenShake(0.5);
+        if (lightningNoise) lightningNoise.triggerAttackRelease('16n');
+
+        setTimeout(() => {
+          bloodBeam.material.opacity = 0;
+          bloodBeam.visible = false;
+        }, 120);
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 24) {
+          applyDamageToDummy(15, 'NORMAL', true);
+          spawnDebris(dummy.root.position, 12);
+          showHitBanner("PIERCING BLOOD (15 DMG)!");
+        }
+      } else {
+        state.cooldowns.skill2 = 7.0;
+        state.player.actionDuration = 0.62;
+        state.player.actionTimer = 0.62;
+        state.player.currentMove = 'MANJI';
+        state.player.vel.add(forward.multiplyScalar(15));
+        playPunchSound(true);
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 5.2) {
+          const isFinisherTarget = (state.dummy.hp < 15);
+          triggerScreenShake(0.48);
+          spawnDebris(dummy.root.position, 14);
+          applyDamageToDummy(9, isFinisherTarget ? 'FAR_LAUNCH' : 'NORMAL', true);
+          addAwakeningGauge(9);
+          showHitBanner(isFinisherTarget ? "MANJI KICK AERIAL FINISHER!!" : "MANJI KICK (9 DMG)!");
+        }
+      }
+    }
+
+    // Move 3: Cursed Dropkick (11s CD / 15 DMG) / Ult: Cleave Rush (8s CD / 15 DMG)
+    function triggerMove3() {
+      if (state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
+      if (state.cooldowns.skill3 > 0) return;
+
+      state.player.state = 'ATTACKING';
+      state.player.actionDuration = 0.65;
+      state.player.actionTimer = 0.65;
+
+      if (!state.shiftLock) {
+        const toDummy = dummy.root.position.clone().sub(yuji.root.position);
+        toDummy.y = 0;
+        state.player.rotY = Math.atan2(toDummy.x, toDummy.z);
+      }
+      const forward = new THREE.Vector3(Math.sin(state.player.rotY), 0, Math.cos(state.player.rotY));
+
+      if (state.player.inZone) {
+        state.cooldowns.skill3 = 8.0;
+        state.player.currentMove = 'CLEAVE_RUSH';
+        state.player.vel.add(forward.multiplyScalar(26));
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 6.0) {
+          triggerAnimeImpactFrame();
+          triggerScreenShake(0.7);
+          spawnDebris(dummy.root.position, 16);
+          applyDamageToDummy(15, 'FAR_LAUNCH', true);
+          showHitBanner("CLEAVE RUSH (15 DMG)!");
+        }
+      } else {
+        state.cooldowns.skill3 = 11.0;
+        state.player.currentMove = 'DROPKICK';
+        state.player.vel.add(forward.multiplyScalar(26));
+        state.player.vel.y = 5.5;
+        playPunchSound(true);
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 5.8) {
+          const isFinisherTarget = (state.dummy.hp < 15);
+          triggerAnimeImpactFrame();
+          triggerScreenShake(0.65);
+          spawnDebris(dummy.root.position, 18);
+          applyDamageToDummy(15, isFinisherTarget ? 'FAR_LAUNCH' : 'DROPKICK_LAUNCH', true);
+          addAwakeningGauge(12);
+          showHitBanner(isFinisherTarget ? "CURSED DROPKICK SUPER-FINISHER!!" : "CURSED DROPKICK (15 DMG)!");
+        }
+      }
+    }
+
+    // Move 4: Black Flash (10 DMG, strict 1s chain) / Ult: 8x Barrage (35s CD / 4 DMG x 8)
+    function triggerMove4() {
+      if (state.player.isDead || state.cinematic.active) return;
+
+      const isChaining = (state.player.chainWindowTimer > 0);
+      if (!isChaining && state.player.state !== 'IDLE') return;
+      if (!isChaining && state.cooldowns.skill4 > 0) return;
+
+      state.player.state = 'ATTACKING';
+      state.player.actionDuration = 0.55;
+      state.player.actionTimer = 0.55;
+
+      if (!state.shiftLock) {
+        const toDummy = dummy.root.position.clone().sub(yuji.root.position);
+        toDummy.y = 0;
+        state.player.rotY = Math.atan2(toDummy.x, toDummy.z);
+      }
+      const forward = new THREE.Vector3(Math.sin(state.player.rotY), 0, Math.cos(state.player.rotY));
+
+      if (state.player.inZone) {
+        state.cooldowns.skill4 = 35.0;
+        state.player.currentMove = 'BARRAGE';
+        state.player.vel.add(forward.multiplyScalar(18));
+
+        let hitCount = 0;
+        const barrageInterval = setInterval(() => {
+          if (state.player.isDead || state.dummy.isDead) {
+            clearInterval(barrageInterval);
+            return;
+          }
+          hitCount++;
+          state.player.blackFlashStreak++;
+          playBlackFlashSound(hitCount);
+          triggerScreenShake(0.3 + hitCount * 0.08);
+          spawnBlackFlashLightning(dummy.root.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 1.1 + hitCount * 0.1);
+          applyDamageToDummy(4, 'NORMAL', true);
+          updateBlackFlashStreakUI(state.player.blackFlashStreak);
+
+          if (hitCount >= 8) {
+            clearInterval(barrageInterval);
+            triggerAnimeImpactFrame();
+            triggerScreenShake(1.3);
+            applyDamageToDummy(4, 'BLACK_FLASH_LAUNCH', true);
+            state.player.chainWindowTimer = 1.0;
+            showChainIndicator(true, 1.0);
+            showHitBanner("8x KOKUSEN BARRAGE COMPLETE (4 DMG x 8)!");
+          }
+        }, 90);
+      } else {
+        state.player.currentMove = 'BLACK_FLASH';
+        state.player.vel.add(forward.multiplyScalar(22));
+
+        const d = yuji.root.position.distanceTo(dummy.root.position);
+        if (d < 3.4) {
+          const isFinisherTarget = (state.dummy.hp < 15);
+          state.player.blackFlashStreak++;
+          const streak = state.player.blackFlashStreak;
+
+          playBlackFlashSound(streak);
+          triggerAnimeImpactFrame();
+          state.hitstop = 0.1;
+          triggerScreenShake(0.7 + streak * 0.16);
+
+          const hitPos = dummy.root.position.clone().add(new THREE.Vector3(0, 1.3, 0));
+          spawnBlackFlashLightning(hitPos, 1.2 + streak * 0.22);
+          spawnDebris(dummy.root.position, 18);
+
+          const cleanHit = applyDamageToDummy(10, 'BLACK_FLASH_LAUNCH', false);
+
+          if (cleanHit) {
+            addAwakeningGauge(16);
+            updateBlackFlashStreakUI(streak);
+
+            if (isFinisherTarget) {
+              showHitBanner("KOKUSEN COLLAPSE FINISHER!!");
+            }
+
+            state.player.chainWindowTimer = 1.0;
+            showChainIndicator(true, 1.0);
+            showHitBanner(`KOKUSEN #${streak}! (1.0s CHAIN ACTIVE)`);
+          } else {
+            resetBlackFlashStreak();
+            state.cooldowns.skill4 = 5.0;
+          }
+        } else {
+          showHitBanner("BLACK FLASH MISSED (CHAIN LOST)!");
+          resetBlackFlashStreak();
+          state.cooldowns.skill4 = 5.0;
+        }
+      }
+    }
+
+    function executeDash() {
+      if (state.player.isDead || state.cinematic.active) return;
+      if (state.player.state !== 'IDLE' && state.player.state !== 'DASHING') return;
+      if (state.cooldowns.dash > 0) return;
+
+      state.cooldowns.dash = 0.9;
+      state.player.state = 'DASHING';
+      state.player.actionDuration = 0.38;
+      state.player.actionTimer = 0.38;
+
+      if (keys['KeyS'] || keys['ArrowDown']) {
+        state.player.dashDirection = 'BACK';
+      } else if (keys['KeyA'] || keys['ArrowLeft']) {
+        state.player.dashDirection = 'LEFT';
+      } else if (keys['KeyD'] || keys['ArrowRight']) {
+        state.player.dashDirection = 'RIGHT';
+      } else {
+        state.player.dashDirection = 'FORWARD';
+      }
+
+      let moveDir = getMovementInputVector();
+      if (moveDir.lengthSq() < 0.1) {
+        moveDir = new THREE.Vector3(Math.sin(state.player.rotY), 0, Math.cos(state.player.rotY));
+      }
+
+      state.player.vel.copy(moveDir.multiplyScalar(82));
+      state.player.vel.y = 8.5;
+      playDodgeSound();
+      triggerScreenShake(0.24);
+    }
+
+    function getMovementInputVector() {
+      const v = new THREE.Vector3();
+      const forward = new THREE.Vector3(-Math.sin(state.camera.yaw), 0, -Math.cos(state.camera.yaw));
+      const right = new THREE.Vector3(Math.cos(state.camera.yaw), 0, -Math.sin(state.camera.yaw));
+
+      if (keys['KeyW'] || keys['ArrowUp']) v.add(forward);
+      if (keys['KeyS'] || keys['ArrowDown']) v.sub(forward);
+      if (keys['KeyD'] || keys['ArrowRight']) v.add(right);
+      if (keys['KeyA'] || keys['ArrowLeft']) v.sub(right);
+
+      if (v.lengthSq() > 0) v.normalize();
+      return v;
+    }
+
+    const keys = {};
+    let isMouseDown = false;
+    let isRightMouseDown = false;
+    let isLeftDragging = false;
+    let mouseStartPos = { x: 0, y: 0 };
+    let lastMousePos = { x: 0, y: 0 };
+
+    window.addEventListener('keydown', (e) => {
+      initAudio();
+      keys[e.code] = true;
+
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyZ') {
+        toggleShiftLock();
+      }
+
+      if (e.code === 'Space') {
+        executeJump();
+      }
+
+      if (state.cinematic.active || state.player.isDead) return;
+
+      if (e.code === 'Digit1') triggerMove1();
+      if (e.code === 'Digit2') triggerMove2();
+      if (e.code === 'Digit3') triggerMove3();
+      if (e.code === 'Digit4') triggerMove4();
+      if (e.code === 'KeyQ') executeDash();
+      if (e.code === 'KeyF') {
+        state.player.isBlocking = true;
+        const tag = document.getElementById('player-state-text');
+        if (tag) tag.innerText = 'GUARDING';
+      }
+      if (e.code === 'KeyG') {
+        tryActivateTheZone();
+      }
+      if (e.code === 'KeyR') respawnDummy();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+      if (e.code === 'KeyF') {
+        state.player.isBlocking = false;
+        const tag = document.getElementById('player-state-text');
+        if (tag) tag.innerText = 'READY';
+      }
+    });
+
+    let lookTouchId = null;
+    let lastTouchLookPos = { x: 0, y: 0 };
+
+    window.addEventListener('touchstart', (e) => {
+      initAudio();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        if (el && (el.closest('button') || el.closest('#mobile-controls'))) {
+          continue;
+        }
+
+        if (lookTouchId === null) {
+          lookTouchId = touch.identifier;
+          lastTouchLookPos = { x: touch.clientX, y: touch.clientY };
+          break;
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (lookTouchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === lookTouchId) {
+          const dx = touch.clientX - lastTouchLookPos.x;
+          const dy = touch.clientY - lastTouchLookPos.y;
+
+          state.camera.yaw -= dx * 0.007;
+          state.camera.pitch = Math.max(-0.25, Math.min(1.25, state.camera.pitch + dy * 0.006));
+
+          lastTouchLookPos = { x: touch.clientX, y: touch.clientY };
+          break;
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+      if (lookTouchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === lookTouchId) {
+          lookTouchId = null;
+          break;
+        }
+      }
+    });
+
+    window.addEventListener('touchcancel', () => {
+      lookTouchId = null;
+    });
+
+    window.addEventListener('mousedown', (e) => {
+      initAudio();
+      if (e.target.closest('button') || e.target.closest('#mobile-controls')) return;
+
+      lastMousePos = { x: e.clientX, y: e.clientY };
+      mouseStartPos = { x: e.clientX, y: e.clientY };
+
+      if (e.button === 0) {
+        isMouseDown = true;
+        isLeftDragging = false;
+      } else if (e.button === 2) {
+        isRightMouseDown = true;
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) {
+        const distMoved = Math.hypot(e.clientX - mouseStartPos.x, e.clientY - mouseStartPos.y);
+        if (!isLeftDragging && distMoved < 6 && !state.cinematic.active && !state.player.isDead) {
+          if (state.player.chainWindowTimer > 0) {
+            triggerMove4();
+          } else {
+            executeM1();
+          }
+        }
+        isMouseDown = false;
+        isLeftDragging = false;
+      }
+      if (e.button === 2) isRightMouseDown = false;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      const movementX = (document.pointerLockElement) ? e.movementX : (e.clientX - lastMousePos.x);
+      const movementY = (document.pointerLockElement) ? e.movementY : (e.clientY - lastMousePos.y);
+
+      if (isMouseDown) {
+        const totalDist = Math.hypot(e.clientX - mouseStartPos.x, e.clientY - mouseStartPos.y);
+        if (totalDist > 5) {
+          isLeftDragging = true;
+        }
+      }
+
+      if (state.shiftLock || isRightMouseDown || (isMouseDown && isLeftDragging)) {
+        state.camera.yaw -= movementX * 0.005;
+        state.camera.pitch = Math.max(-0.25, Math.min(1.25, state.camera.pitch + movementY * 0.005));
+      }
+
+      lastMousePos = { x: e.clientX, y: e.clientY };
+    });
+
+    // PC Mouse Wheel Camera Zoom
+    window.addEventListener('wheel', (e) => {
+      if (state.cinematic.active) return;
+      state.camera.dist = Math.max(3.5, Math.min(22.0, state.camera.dist + e.deltaY * 0.012));
+    }, { passive: true });
+
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    document.getElementById('btn-m1').addEventListener('click', () => {
+      if (state.cinematic.active || state.player.isDead) return;
+      initAudio();
+      if (state.player.chainWindowTimer > 0) triggerMove4();
+      else executeM1();
+    });
+    document.getElementById('btn-skill-1').addEventListener('click', () => { if (!state.cinematic.active && !state.player.isDead) { initAudio(); triggerMove1(); } });
+    document.getElementById('btn-skill-2').addEventListener('click', () => { if (!state.cinematic.active && !state.player.isDead) { initAudio(); triggerMove2(); } });
+    document.getElementById('btn-skill-3').addEventListener('click', () => { if (!state.cinematic.active && !state.player.isDead) { initAudio(); triggerMove3(); } });
+    document.getElementById('btn-skill-4').addEventListener('click', () => { if (!state.cinematic.active && !state.player.isDead) { initAudio(); triggerMove4(); } });
+    document.getElementById('btn-dash').addEventListener('click', () => { if (!state.cinematic.active && !state.player.isDead) { initAudio(); executeDash(); } });
+    document.getElementById('btn-jump').addEventListener('click', () => { if (!state.cinematic.active && !state.player.isDead) { initAudio(); executeJump(); } });
+    document.getElementById('btn-shiftlock').addEventListener('click', toggleShiftLock);
+
+    document.getElementById('btn-block').addEventListener('mousedown', () => { if (!state.cinematic.active && !state.player.isDead) state.player.isBlocking = true; });
+    document.getElementById('btn-block').addEventListener('mouseup', () => { state.player.isBlocking = false; });
+    document.getElementById('btn-block').addEventListener('touchstart', (e) => { e.preventDefault(); if (!state.cinematic.active && !state.player.isDead) state.player.isBlocking = true; });
+    document.getElementById('btn-block').addEventListener('touchend', (e) => { e.preventDefault(); state.player.isBlocking = false; });
+    document.getElementById('btn-awaken').addEventListener('click', () => { initAudio(); tryActivateTheZone(); });
+
+    document.getElementById('btn-dummy-mode').addEventListener('click', () => {
+      const modes = ['SANDBAG', 'DEFENSIVE', 'AGGRESSIVE'];
+      const next = modes[(modes.indexOf(state.dummy.mode) + 1) % modes.length];
+      state.dummy.mode = next;
+      const t = document.getElementById('dummy-mode-text');
+
+      if (next === 'SANDBAG') {
+        if (t) { t.innerText = 'SANDBAG'; t.className = 'text-green-400 font-black'; }
+        showHitBanner("AI: PRACTICE SANDBAG MODE");
+      } else if (next === 'DEFENSIVE') {
+        if (t) { t.innerText = 'DEFENSIVE'; t.className = 'text-yellow-400 font-black'; }
+        showHitBanner("AI: DEFENSIVE BLOCK MODE");
+      } else {
+        if (t) { t.innerText = 'AGGRESSIVE'; t.className = 'text-red-400 font-black'; }
+        showHitBanner("AI: AGGRESSIVE PVP MODE");
+      }
+    });
+
+    document.getElementById('btn-reset-dummy').addEventListener('click', respawnDummy);
+
+    let soundEnabled = true;
+    document.getElementById('btn-sound').addEventListener('click', () => {
+      initAudio();
+      soundEnabled = !soundEnabled;
+      if (window.Tone && Tone.Destination) {
+        Tone.Destination.mute = !soundEnabled;
+      }
+      const icon = document.getElementById('sound-icon');
+      if (icon) icon.innerText = soundEnabled ? '🔊' : '🔇';
+    });
+
+    // Touch Virtual Joystick
+    const joystick = document.getElementById('mobile-controls');
+    const knob = document.getElementById('joystick-knob');
+    let joystickTouchId = null;
+    let joystickCenter = { x: 0, y: 0 };
+    let joystickVector = { x: 0, y: 0 };
+
+    joystick.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+      initAudio();
+      const touch = e.changedTouches[0];
+      joystickTouchId = touch.identifier;
+      const rect = joystick.getBoundingClientRect();
+      joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      handleJoystickMove(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (joystickTouchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          handleJoystickMove(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+          break;
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+      if (joystickTouchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          joystickTouchId = null;
+          joystickVector = { x: 0, y: 0 };
+          knob.style.transform = `translate(0px, 0px)`;
+          break;
+        }
+      }
+    });
+
+    function handleJoystickMove(clientX, clientY) {
+      const dx = clientX - joystickCenter.x;
+      const dy = clientY - joystickCenter.y;
+      const maxRadius = 24;
+      const dist = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+      const clampedDist = Math.min(dist, maxRadius);
+
+      const kx = Math.cos(angle) * clampedDist;
+      const ky = Math.sin(angle) * clampedDist;
+      knob.style.transform = `translate(${kx}px, ${ky}px)`;
+
+      joystickVector = {
+        x: kx / maxRadius,
+        y: ky / maxRadius
+      };
+    }
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const rawDt = clock.getDelta();
+      const dt = Math.min(rawDt, 0.05);
+      const time = clock.getElapsedTime();
+
+      // Dynamic Animated Ocean Waves
+      const posAttr = waterGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const u = posAttr.getX(i);
+        const v = posAttr.getY(i);
+        const wave1 = Math.sin(u * 0.12 + time * 2.2) * 0.32;
+        const wave2 = Math.cos(v * 0.09 + time * 1.8) * 0.26;
+        const wave3 = Math.sin((u + v) * 0.07 + time * 3.1) * 0.16;
+        posAttr.setZ(i, waterBaseZ[i] + wave1 + wave2 + wave3);
+      }
+      posAttr.needsUpdate = true;
+      waterGeo.computeVertexNormals();
+
+      if (state.hitstop > 0) {
+        state.hitstop -= dt;
+        renderer.render(scene, camera);
+        return;
+      }
+
+      if (state.player.isDead) {
+        state.player.respawnTimer -= dt;
+        if (state.player.respawnTimer <= 0) {
+          respawnPlayer();
+        }
+      }
+
+      if (state.player.m1Step > 0 && performance.now() - state.player.lastM1Time > 900) {
+        state.player.m1Step = 0;
+        updateM1Dots(0);
+      }
+
+      if (state.player.jumpFatigueTimer > 0) {
+        state.player.jumpFatigueTimer -= dt;
+        if (state.player.jumpFatigueTimer <= 0) {
+          state.player.jumpFatigueCount = 0;
+        }
+      }
+
+      if (state.player.m1Lockout > 0) {
+        state.player.m1Lockout -= dt;
+      }
+      if (state.cooldowns.m1Delay > 0) {
+        state.cooldowns.m1Delay -= dt;
+      }
+
+      // 6-Second Awakening Cinematic Cutscene
+      if (state.cinematic.active) {
+        state.cinematic.timer -= dt;
+        state.cinematic.heartbeatTimer -= dt;
+
+        if (state.cinematic.heartbeatTimer <= 0) {
+          state.cinematic.heartbeatTimer = Math.max(0.24, state.cinematic.timer * 0.14);
+          if (heartbeatSynth) heartbeatSynth.triggerAttackRelease('C1', '8n');
+          triggerScreenShake(0.25);
+          spawnBlackFlashLightning(yuji.root.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0.9);
+        }
+
+        const elapsed = 6.0 - state.cinematic.timer;
+        const subTitle = document.getElementById('cinematic-sub-text');
+
+        state.camera.dist = 7.5;
+
+        yuji.torso.rotation.set(0, 0, 0);
+        yuji.pelvis.rotation.set(0, 0, 0);
+        yuji.leftArmPivot.rotation.set(0, 0, 0);
+        yuji.rightArmPivot.rotation.set(0, 0, 0);
+        yuji.leftLegPivot.rotation.set(0, 0, 0);
+        yuji.rightLegPivot.rotation.set(0, 0, 0);
+
+        if (elapsed < 2.0) {
+          if (subTitle) subTitle.innerText = "SOUL COMPRESSION";
+          yuji.pelvis.position.y = 1.35;
+          yuji.torso.rotation.x = 0.45;
+          yuji.head.rotation.x = 0.35;
+          yuji.rightArmPivot.rotation.x = -Math.PI / 2.5;
+          yuji.rightArmPivot.rotation.z = -0.35;
+          yuji.leftArmPivot.rotation.x = -Math.PI / 3;
+          yuji.leftArmPivot.rotation.z = 0.2;
+        } else if (elapsed < 4.6) {
+          if (subTitle) subTitle.innerText = "120% POTENTIAL IGNITION!";
+          const violentTremor = (Math.random() - 0.5) * 0.35;
+          const headTremor = (Math.random() - 0.5) * 0.24;
+          
+          triggerScreenShake(0.32);
+          yuji.pelvis.position.y = 1.45 + (Math.random() - 0.5) * 0.07;
+          yuji.torso.rotation.x = -0.3 + violentTremor * 0.6;
+          yuji.torso.rotation.z = violentTremor * 0.5;
+          yuji.head.rotation.x = -0.65 + headTremor;
+          yuji.head.rotation.y = headTremor * 0.8;
+
+          yuji.rightArmPivot.rotation.x = -Math.PI / 2.2 + violentTremor;
+          yuji.rightArmPivot.rotation.z = 0.6 + violentTremor;
+          yuji.leftArmPivot.rotation.x = -Math.PI / 2.2 - violentTremor;
+          yuji.leftArmPivot.rotation.z = -0.6 - violentTremor;
+
+          yuji.leftLegPivot.rotation.x = -0.35;
+          yuji.rightLegPivot.rotation.x = 0.35;
+
+          if (Math.random() > 0.45) {
+            spawnBlackFlashShockwave(yuji.root.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 1.1);
+          }
+          if (Math.random() > 0.6) {
+            spawnBlackFlashLightning(yuji.root.position.clone().add(new THREE.Vector3(0, 1.3, 0)), 1.4);
+          }
+        } else {
+          if (subTitle) subTitle.innerText = "THE ESSENCE UNLEASHED!";
+          const roarShake = (Math.random() - 0.5) * 0.16;
+          yuji.pelvis.position.y = 1.25;
+          yuji.torso.rotation.x = 0.4 + roarShake;
+          yuji.torso.rotation.y = -0.25;
+          yuji.head.rotation.x = -0.5;
+          yuji.rightArmPivot.rotation.x = -Math.PI / 1.4;
+          yuji.rightArmPivot.rotation.y = 0.35;
+          yuji.leftArmPivot.rotation.x = 0.4;
+          yuji.leftLegPivot.rotation.x = -0.65;
+          yuji.rightLegPivot.rotation.x = 0.55;
+
+          if (Math.random() > 0.3) {
+            spawnBlackFlashLightning(yuji.root.position.clone().add(new THREE.Vector3(0, 1.4, 0)), 2.0);
+          }
+        }
+
+        if (state.cinematic.timer <= 0) {
+          completeCinematicAwakening();
+        }
+
+        const camDist = 7.5;
+        const camTarget = yuji.root.position.clone().add(state.camera.targetOffset);
+
+        const cx = camTarget.x + Math.sin(state.camera.yaw) * Math.cos(state.camera.pitch) * camDist;
+        const cy = camTarget.y + Math.sin(state.camera.pitch) * camDist;
+        const cz = camTarget.z + Math.cos(state.camera.yaw) * Math.cos(state.camera.pitch) * camDist;
+
+        camera.position.set(cx, cy, cz);
+        if (state.camera.shake > 0) {
+          state.camera.shake = Math.max(0, state.camera.shake - dt * 2.8);
+          camera.position.x += (Math.random() - 0.5) * state.camera.shake;
+          camera.position.y += (Math.random() - 0.5) * state.camera.shake;
+          camera.position.z += (Math.random() - 0.5) * state.camera.shake;
+        }
+        camera.lookAt(camTarget);
+
+        renderer.render(scene, camera);
+        return;
+      }
+
+      if (state.player.chainWindowTimer > 0) {
+        state.player.chainWindowTimer -= dt;
+        showChainIndicator(true, state.player.chainWindowTimer);
+        if (state.player.chainWindowTimer <= 0) {
+          showChainIndicator(false);
+          if (!state.player.inZone) {
+            resetBlackFlashStreak();
+            state.cooldowns.skill4 = 5.0;
+          }
+        }
+      }
+
+      if (state.player.inZone) {
+        state.player.zoneTimer -= dt;
+        updateAwakeningUI();
+        if (state.player.zoneTimer <= 0) {
+          deactivateTheZone();
+        }
+      }
+
+      for (const k in state.cooldowns) {
+        if (state.cooldowns[k] > 0) {
+          state.cooldowns[k] -= dt;
+          const cdEl = document.getElementById(`cd-${k.replace('skill', '')}`);
+          if (cdEl) {
+            if (state.cooldowns[k] > 0.05) {
+              cdEl.classList.remove('hidden');
+              cdEl.innerText = state.cooldowns[k].toFixed(1);
+            } else {
+              cdEl.classList.add('hidden');
+            }
+          }
+        }
+      }
+
+      if (state.player.actionTimer > 0) {
+        state.player.actionTimer -= dt;
+        if (state.player.actionTimer <= 0 && state.player.state !== 'IDLE') {
+          state.player.state = 'IDLE';
+          state.player.currentMove = null;
+        }
+      }
+
+      let moveDir = getMovementInputVector();
+      if (joystickTouchId !== null) {
+        const joyForward = new THREE.Vector3(-Math.sin(state.camera.yaw), 0, -Math.cos(state.camera.yaw));
+        const joyRight = new THREE.Vector3(Math.cos(state.camera.yaw), 0, -Math.sin(state.camera.yaw));
+        moveDir = joyForward.multiplyScalar(-joystickVector.y).add(joyRight.multiplyScalar(joystickVector.x));
+        if (moveDir.lengthSq() > 1) moveDir.normalize();
+      }
+
+      if (state.shiftLock) {
+        const desiredRot = state.camera.yaw + Math.PI;
+        let diff = desiredRot - state.player.rotY;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        state.player.rotY += diff * 0.45;
+      }
+
+      if (!state.player.isDead && state.player.state === 'IDLE' && moveDir.lengthSq() > 0.01) {
+        const guardMultiplier = state.player.isBlocking ? 0.42 : 1.0;
+        const speed = state.player.speed * guardMultiplier * (state.player.inZone ? 1.35 : 1.0);
+        state.player.vel.x += moveDir.x * speed * dt * 10;
+        state.player.vel.z += moveDir.z * speed * dt * 10;
+
+        if (!state.shiftLock) {
+          const targetRot = Math.atan2(moveDir.x, moveDir.z);
+          let diff = targetRot - state.player.rotY;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          state.player.rotY += diff * 0.25;
+        }
+      }
+
+      state.player.vel.x *= 0.82;
+      state.player.vel.z *= 0.82;
+      state.player.vel.y -= 22 * dt;
+      yuji.root.position.addScaledVector(state.player.vel, dt);
+
+      const playerTerrainY = getTerrainHeight(yuji.root.position.x, yuji.root.position.z);
+      if (yuji.root.position.y <= playerTerrainY) {
+        yuji.root.position.y = playerTerrainY;
+        state.player.vel.y = 0;
+        if (state.player.isAirborne) {
+          state.player.isAirborne = false;
+          state.player.hasDownslamReady = false;
+        }
+      }
+
+      // Island Boundary Clamping (Soft beach perimeter)
+      const beachLimit = islandRadius - 2.5;
+      const pDist = Math.hypot(yuji.root.position.x, yuji.root.position.z);
+      if (pDist > beachLimit) {
+        const pAngle = Math.atan2(yuji.root.position.z, yuji.root.position.x);
+        yuji.root.position.x = Math.cos(pAngle) * beachLimit;
+        yuji.root.position.z = Math.sin(pAngle) * beachLimit;
+      }
+      yuji.root.rotation.y = state.player.rotY;
+
+      state.dummy.vel.x *= 0.88;
+      state.dummy.vel.z *= 0.88;
+      state.dummy.vel.y -= 25 * dt;
+      dummy.root.position.addScaledVector(state.dummy.vel, dt);
+
+      const dummyTerrainY = getTerrainHeight(dummy.root.position.x, dummy.root.position.z);
+      if (dummy.root.position.y <= dummyTerrainY) {
+        dummy.root.position.y = dummyTerrainY;
+        state.dummy.vel.y = 0;
+      }
+
+      // Shoreline boundary bounce for dummy
+      const dDist = Math.hypot(dummy.root.position.x, dummy.root.position.z);
+      if (dDist > beachLimit) {
+        const dAngle = Math.atan2(dummy.root.position.z, dummy.root.position.x);
+        dummy.root.position.x = Math.cos(dAngle) * beachLimit;
+        dummy.root.position.z = Math.sin(dAngle) * beachLimit;
+        if (state.dummy.vel.length() > 12) {
+          playPunchSound(true);
+          triggerScreenShake(0.42);
+          spawnDebris(dummy.root.position, 16);
+          showHitBanner("SHORELINE IMPACT!!");
+          state.dummy.vel.x *= -0.7;
+          state.dummy.vel.z *= -0.7;
+        }
+      }
+
+      updateDummyAI(dt);
+
+      dummy.torso.rotation.set(0, 0, 0);
+      dummy.pelvis.rotation.set(0, 0, 0);
+      dummy.leftArmPivot.rotation.set(0, 0, 0);
+      dummy.rightArmPivot.rotation.set(0, 0, 0);
+      dummy.leftLegPivot.rotation.set(0, 0, 0);
+      dummy.rightLegPivot.rotation.set(0, 0, 0);
+      dummy.leftElbow.rotation.set(0, 0, 0);
+      dummy.rightElbow.rotation.set(0, 0, 0);
+      dummy.leftKnee.rotation.set(0, 0, 0);
+      dummy.rightKnee.rotation.set(0, 0, 0);
+      dummy.pelvis.position.y = 1.6;
+
+      if (state.dummy.isDead) {
+        dummy.pelvis.position.y = 0.22;
+        dummy.pelvis.rotation.x = -Math.PI / 2;
+        dummy.torso.rotation.set(0, 0, 0);
+        dummy.head.rotation.set(-0.2, 0, 0);
+        dummy.leftLegPivot.rotation.set(0, 0, 0.1);
+        dummy.rightLegPivot.rotation.set(0, 0, -0.1);
+        dummy.leftArmPivot.rotation.set(0, 0, 0.5);
+        dummy.rightArmPivot.rotation.set(0, 0, -0.5);
+      } else if (state.dummy.isHeadInGround) {
+        dummy.pelvis.position.y = 1.35;
+        dummy.pelvis.rotation.set(0, 0, 0);
+        dummy.torso.rotation.set(Math.PI, 0, 0);
+        dummy.head.position.y = -0.4;
+        dummy.head.rotation.set(0, 0, 0);
+        dummy.leftLegPivot.rotation.set(-0.35, 0, 0.25);
+        dummy.rightLegPivot.rotation.set(-0.4, 0, -0.25);
+        dummy.leftKnee.rotation.set(-0.3, 0, 0);
+        dummy.rightKnee.rotation.set(-0.3, 0, 0);
+        dummy.leftArmPivot.rotation.set(-Math.PI * 0.9, 0, 0.35);
+        dummy.rightArmPivot.rotation.set(-Math.PI * 0.9, 0, -0.35);
+      } else if (state.dummy.state === 'LAUNCHED_BACK') {
+        dummy.pelvis.position.y = 1.7;
+        dummy.torso.rotation.x = -0.7;
+        dummy.head.rotation.x = 0.6;
+        dummy.leftArmPivot.rotation.x = 1.2;
+        dummy.rightArmPivot.rotation.x = 1.2;
+        dummy.leftLegPivot.rotation.x = -0.8;
+        dummy.rightLegPivot.rotation.x = -0.8;
+      } else if (state.dummy.stunTimer > 0) {
+        dummy.torso.rotation.x = 0.4;
+        dummy.head.rotation.x = 0.5;
+        dummy.leftArmPivot.rotation.x = 0.3;
+        dummy.rightArmPivot.rotation.x = 0.3;
+      } else if (state.dummy.state === 'RAGDOLL') {
+        dummy.pelvis.position.y = 0.22;
+        dummy.pelvis.rotation.x = -Math.PI / 2;
+        dummy.torso.rotation.set(0, 0, 0);
+        dummy.head.rotation.set(-0.2, 0, 0);
+        dummy.leftLegPivot.rotation.set(0, 0, 0.1);
+        dummy.rightLegPivot.rotation.set(0, 0, -0.1);
+        dummy.leftArmPivot.rotation.set(0, 0, 0.4);
+        dummy.rightArmPivot.rotation.set(0, 0, -0.4);
+      } else if (state.dummy.isBlocking) {
+        dummy.rightArmPivot.rotation.x = -Math.PI / 1.9;
+        dummy.rightArmPivot.rotation.y = -0.55;
+        dummy.leftArmPivot.rotation.x = -Math.PI / 1.9;
+        dummy.leftArmPivot.rotation.y = 0.55;
+        dummy.rightElbow.rotation.x = -0.6;
+        dummy.leftElbow.rotation.x = -0.6;
+        dummy.torso.rotation.x = 0.2;
+      } else if (state.dummy.state === 'ATTACKING') {
+        if (state.dummy.attackPhase === 1) {
+          dummy.rightArmPivot.rotation.x = -Math.PI / 1.4;
+          dummy.rightArmPivot.rotation.y = -0.4;
+          dummy.rightElbow.rotation.x = -0.25;
+          dummy.torso.rotation.y = -0.45;
+          dummy.torso.rotation.x = 0.3;
+        } else {
+          dummy.leftArmPivot.rotation.x = -Math.PI / 1.5;
+          dummy.leftArmPivot.rotation.y = 0.45;
+          dummy.leftElbow.rotation.x = -0.3;
+          dummy.torso.rotation.y = 0.5;
+          dummy.torso.rotation.x = 0.25;
+        }
+      } else if (state.dummy.vel.lengthSq() > 1.0) {
+        const dWalk = state.dummy.walkCycle;
+        dummy.leftLegPivot.rotation.x = Math.sin(dWalk) * 0.75;
+        dummy.rightLegPivot.rotation.x = -Math.sin(dWalk) * 0.75;
+        dummy.leftKnee.rotation.x = Math.max(0, -Math.sin(dWalk) * 0.65);
+        dummy.rightKnee.rotation.x = Math.max(0, Math.sin(dWalk) * 0.65);
+        dummy.leftArmPivot.rotation.x = -Math.sin(dWalk) * 0.7;
+        dummy.rightArmPivot.rotation.x = Math.sin(dWalk) * 0.7;
+        dummy.torso.rotation.x = 0.25;
+      } else {
+        dummy.pelvis.position.y = 1.6 + Math.sin(clock.getElapsedTime() * 2.5) * 0.03;
+        dummy.torso.rotation.y = Math.sin(clock.getElapsedTime() * 1.5) * 0.08;
+      }
+
+      const isMoving = (state.player.vel.lengthSq() > 1.2);
+      const walkTime = clock.getElapsedTime() * 14;
+      const animProgress = state.player.actionDuration > 0 ? (1 - (state.player.actionTimer / state.player.actionDuration)) : 0;
+
+      yuji.torso.rotation.set(0, 0, 0);
+      yuji.pelvis.rotation.set(0, 0, 0);
+      yuji.pelvis.position.y = 1.6;
+      yuji.head.rotation.set(0, 0, 0);
+      yuji.leftArmPivot.rotation.set(0, 0, 0);
+      yuji.rightArmPivot.rotation.set(0, 0, 0);
+      yuji.leftElbow.rotation.set(0, 0, 0);
+      yuji.rightElbow.rotation.set(0, 0, 0);
+      yuji.leftLegPivot.rotation.set(0, 0, 0);
+      yuji.rightLegPivot.rotation.set(0, 0, 0);
+      yuji.leftKnee.rotation.set(0, 0, 0);
+      yuji.rightKnee.rotation.set(0, 0, 0);
+
+      if (yuji.aura) {
+        if (state.player.chainWindowTimer > 0 || state.player.inZone) {
+          yuji.aura.material.opacity = 0.75 + Math.sin(clock.getElapsedTime() * 18) * 0.25;
+          yuji.aura.rotation.y += 0.1;
+        } else {
+          yuji.aura.material.opacity = 0;
+        }
+      }
+
+      if (state.player.isDead) {
+        yuji.pelvis.position.y = 0.22;
+        yuji.pelvis.rotation.x = -Math.PI / 2;
+        yuji.torso.rotation.set(0, 0, 0);
+        yuji.head.rotation.set(-0.2, 0, 0);
+        yuji.leftLegPivot.rotation.set(0, 0, 0.1);
+        yuji.rightLegPivot.rotation.set(0, 0, -0.1);
+        yuji.leftArmPivot.rotation.set(0, 0, 0.5);
+        yuji.rightArmPivot.rotation.set(0, 0, -0.5);
+      } else if (state.player.state === 'ATTACKING') {
+        const move = state.player.currentMove;
+
+        if (move === 'DOWNSLAM_FINISHER') {
+          yuji.pelvis.position.y = 1.1;
+          yuji.torso.rotation.x = 0.9;
+          yuji.rightArmPivot.rotation.x = -Math.PI / 1.05;
+          yuji.leftArmPivot.rotation.x = -Math.PI / 1.05;
+          yuji.rightElbow.rotation.x = -0.3;
+          yuji.leftElbow.rotation.x = -0.3;
+        } else if (move === 'M1') {
+          const step = state.player.m1Step;
+          if (step === 1) {
+            yuji.pelvis.position.y = 1.52;
+            yuji.torso.rotation.y = 0.48;
+            yuji.torso.rotation.x = 0.16;
+            yuji.leftArmPivot.rotation.x = -Math.PI / 1.72;
+            yuji.leftArmPivot.rotation.y = 0.12;
+            yuji.leftElbow.rotation.x = -0.15;
+            yuji.rightArmPivot.rotation.x = -0.58;
+            yuji.rightArmPivot.rotation.y = -0.28;
+            yuji.rightElbow.rotation.x = -0.7;
+            yuji.leftLegPivot.rotation.x = -0.36;
+            yuji.rightLegPivot.rotation.x = 0.32;
+            yuji.leftKnee.rotation.x = -0.2;
+          } else if (step === 2) {
+            yuji.pelvis.position.y = 1.44;
+            yuji.torso.rotation.y = -0.68;
+            yuji.torso.rotation.x = 0.24;
+            yuji.rightArmPivot.rotation.x = -Math.PI / 1.62;
+            yuji.rightArmPivot.rotation.y = -0.16;
+            yuji.rightElbow.rotation.x = -0.12;
+            yuji.leftArmPivot.rotation.x = -0.52;
+            yuji.leftElbow.rotation.x = -0.65;
+            yuji.rightLegPivot.rotation.x = -0.46;
+            yuji.leftLegPivot.rotation.x = 0.42;
+            yuji.rightKnee.rotation.x = -0.3;
+          } else if (step === 3) {
+            yuji.pelvis.position.y = 1.56;
+            yuji.torso.rotation.x = -0.18;
+            yuji.torso.rotation.z = -0.68;
+            yuji.rightLegPivot.rotation.x = -Math.PI / 2.0;
+            yuji.rightLegPivot.rotation.z = 0.98;
+            yuji.rightKnee.rotation.x = -0.25;
+            yuji.leftArmPivot.rotation.z = -0.62;
+            yuji.rightArmPivot.rotation.z = 0.62;
+          } else {
+            yuji.pelvis.position.y = 1.18;
+            yuji.torso.rotation.x = 0.78;
+            yuji.rightArmPivot.rotation.x = -Math.PI / 1.12;
+            yuji.leftArmPivot.rotation.x = -Math.PI / 1.12;
+            yuji.rightArmPivot.rotation.z = -0.22;
+            yuji.leftArmPivot.rotation.z = 0.22;
+            yuji.rightElbow.rotation.x = -0.25;
+            yuji.leftElbow.rotation.x = -0.25;
+            yuji.leftLegPivot.rotation.x = -0.48;
+            yuji.rightLegPivot.rotation.x = 0.48;
+            yuji.leftKnee.rotation.x = -0.35;
+            yuji.rightKnee.rotation.x = -0.35;
+          }
+        } else if (move === 'DIVERGENT') {
+          if (animProgress < 0.38) {
+            yuji.pelvis.position.y = 1.25;
+            yuji.torso.rotation.y = -0.75;
+            yuji.torso.rotation.x = 0.35;
+            yuji.rightArmPivot.rotation.x = 0.7;
+            yuji.rightArmPivot.rotation.y = -0.55;
+            yuji.rightElbow.rotation.x = -0.8;
+            yuji.leftArmPivot.rotation.x = -Math.PI / 2.2;
+            yuji.leftLegPivot.rotation.x = -0.65;
+            yuji.rightLegPivot.rotation.x = 0.55;
+            yuji.leftKnee.rotation.x = -0.4;
+          } else {
+            yuji.pelvis.position.y = 1.3;
+            yuji.torso.rotation.y = 0.6;
+            yuji.torso.rotation.x = 0.4;
+            yuji.rightArmPivot.rotation.x = -Math.PI / 1.55;
+            yuji.rightArmPivot.rotation.y = 0.25;
+            yuji.rightElbow.rotation.x = -0.15;
+            yuji.leftArmPivot.rotation.x = 0.4;
+            yuji.leftLegPivot.rotation.x = 0.55;
+            yuji.rightLegPivot.rotation.x = -0.65;
+          }
+        } else if (move === 'MANJI') {
+          if (animProgress < 0.48) {
+            yuji.pelvis.position.y = 0.95;
+            yuji.torso.rotation.x = 0.65;
+            yuji.torso.rotation.y = animProgress * Math.PI * 2.8;
+            yuji.leftArmPivot.rotation.x = -Math.PI / 1.4;
+            yuji.leftArmPivot.rotation.z = -0.4;
+            yuji.rightLegPivot.rotation.x = -Math.PI / 1.9;
+            yuji.rightLegPivot.rotation.z = 1.1;
+            yuji.leftLegPivot.rotation.x = 0.3;
+          } else {
+            yuji.pelvis.position.y = 2.1;
+            yuji.torso.rotation.x = -0.85;
+            yuji.leftLegPivot.rotation.x = -Math.PI / 1.4;
+            yuji.rightLegPivot.rotation.x = 0.4;
+            yuji.rightArmPivot.rotation.x = 0.8;
+            yuji.leftArmPivot.rotation.x = 0.8;
+          }
+        } else if (move === 'DROPKICK') {
+          yuji.pelvis.position.y = 2.2;
+          yuji.torso.rotation.x = -Math.PI / 2.05;
+          yuji.leftLegPivot.rotation.x = -Math.PI / 1.95;
+          yuji.rightLegPivot.rotation.x = -Math.PI / 1.95;
+          yuji.leftLegPivot.rotation.z = -0.12;
+          yuji.rightLegPivot.rotation.z = 0.12;
+          yuji.leftArmPivot.rotation.x = 1.1;
+          yuji.rightArmPivot.rotation.x = 1.1;
+          yuji.leftArmPivot.rotation.z = -0.4;
+          yuji.rightArmPivot.rotation.z = 0.4;
+        } else if (move === 'BLACK_FLASH') {
+          if (animProgress < 0.35) {
+            yuji.pelvis.position.y = 1.1;
+            yuji.torso.rotation.x = 0.6;
+            yuji.torso.rotation.y = -0.7;
+            yuji.head.rotation.x = 0.25;
+            yuji.rightArmPivot.rotation.x = 0.75;
+            yuji.rightArmPivot.rotation.y = -0.5;
+            yuji.rightElbow.rotation.x = -0.9;
+            yuji.leftArmPivot.rotation.x = -0.8;
+            yuji.leftLegPivot.rotation.x = -0.7;
+            yuji.rightLegPivot.rotation.x = 0.55;
+            yuji.leftKnee.rotation.x = -0.5;
+          } else {
+            yuji.pelvis.position.y = 1.2;
+            yuji.torso.rotation.x = 0.45;
+            yuji.torso.rotation.y = 0.5;
+            yuji.head.rotation.x = -0.25;
+            yuji.rightArmPivot.rotation.x = -Math.PI / 1.45;
+            yuji.rightArmPivot.rotation.y = 0.3;
+            yuji.rightElbow.rotation.x = -0.1;
+            yuji.leftArmPivot.rotation.x = 0.45;
+            yuji.leftLegPivot.rotation.x = 0.55;
+            yuji.rightLegPivot.rotation.x = -0.65;
+          }
+        } else if (move === 'SOUL_DISMANTLE') {
+          yuji.torso.rotation.x = 0.28;
+          yuji.leftArmPivot.rotation.x = -Math.PI / 1.9;
+          yuji.leftArmPivot.rotation.z = 0.65;
+          yuji.rightArmPivot.rotation.x = -Math.PI / 1.9;
+          yuji.rightArmPivot.rotation.z = -0.65;
+          yuji.leftElbow.rotation.x = -0.4;
+          yuji.rightElbow.rotation.x = -0.4;
+        } else if (move === 'PIERCING_BLOOD') {
+          yuji.torso.rotation.x = -0.15;
+          yuji.leftArmPivot.rotation.x = -Math.PI / 1.9;
+          yuji.leftArmPivot.rotation.y = 0.42;
+          yuji.rightArmPivot.rotation.x = -Math.PI / 1.9;
+          yuji.rightArmPivot.rotation.y = -0.42;
+          yuji.leftElbow.rotation.x = -0.3;
+          yuji.rightElbow.rotation.x = -0.3;
+        } else if (move === 'CLEAVE_RUSH' || move === 'BARRAGE') {
+          const flurry = Math.sin(clock.getElapsedTime() * 34);
+          yuji.torso.rotation.y = flurry * 0.45;
+          yuji.leftArmPivot.rotation.x = -Math.PI / 2 + flurry * 0.65;
+          yuji.rightArmPivot.rotation.x = -Math.PI / 2 - flurry * 0.65;
+          yuji.leftElbow.rotation.x = -0.35;
+          yuji.rightElbow.rotation.x = -0.35;
+        }
+      } else if (state.player.isBlocking) {
+        yuji.rightArmPivot.rotation.x = -Math.PI / 2.0;
+        yuji.leftArmPivot.rotation.x = -Math.PI / 2.0;
+        yuji.rightArmPivot.rotation.y = -0.45;
+        yuji.leftArmPivot.rotation.y = 0.45;
+        yuji.rightElbow.rotation.x = -0.65;
+        yuji.leftElbow.rotation.x = -0.65;
+        yuji.torso.rotation.x = 0.2;
+      } else if (state.player.state === 'DASHING') {
+        const dir = state.player.dashDirection;
+        if (dir === 'BACK') {
+          yuji.pelvis.position.y = 1.8;
+          yuji.torso.rotation.x = -0.45;
+          yuji.leftArmPivot.rotation.x = -0.7;
+          yuji.rightArmPivot.rotation.x = -0.7;
+          yuji.leftLegPivot.rotation.x = 0.6;
+          yuji.rightLegPivot.rotation.x = -0.4;
+        } else if (dir === 'LEFT') {
+          yuji.pelvis.position.y = 1.7;
+          yuji.torso.rotation.z = 0.55;
+          yuji.leftArmPivot.rotation.z = -0.8;
+          yuji.rightArmPivot.rotation.z = -0.3;
+          yuji.leftLegPivot.rotation.z = 0.4;
+        } else if (dir === 'RIGHT') {
+          yuji.pelvis.position.y = 1.7;
+          yuji.torso.rotation.z = -0.55;
+          yuji.rightArmPivot.rotation.z = 0.8;
+          yuji.leftArmPivot.rotation.z = 0.3;
+          yuji.rightLegPivot.rotation.z = -0.4;
+        } else {
+          yuji.pelvis.position.y = 1.9;
+          yuji.torso.rotation.x = 0.85;
+          yuji.leftArmPivot.rotation.x = 1.2;
+          yuji.rightArmPivot.rotation.x = 1.2;
+          yuji.leftLegPivot.rotation.x = -0.8;
+          yuji.rightLegPivot.rotation.x = -0.8;
+          yuji.leftKnee.rotation.x = -0.9;
+          yuji.rightKnee.rotation.x = -0.9;
+        }
+      } else if (state.player.isAirborne) {
+        yuji.pelvis.position.y = 1.7;
+        yuji.torso.rotation.x = 0.15;
+        yuji.leftLegPivot.rotation.x = -0.4;
+        yuji.rightLegPivot.rotation.x = 0.4;
+        yuji.leftKnee.rotation.x = -0.6;
+        yuji.rightKnee.rotation.x = -0.6;
+        yuji.leftArmPivot.rotation.x = -0.4;
+        yuji.rightArmPivot.rotation.x = -0.4;
+      } else if (isMoving) {
+        yuji.torso.rotation.x = 0.28;
+        yuji.leftLegPivot.rotation.x = Math.sin(walkTime) * 0.88;
+        yuji.rightLegPivot.rotation.x = -Math.sin(walkTime) * 0.88;
+        yuji.leftKnee.rotation.x = Math.max(0, -Math.sin(walkTime) * 0.75);
+        yuji.rightKnee.rotation.x = Math.max(0, Math.sin(walkTime) * 0.75);
+
+        yuji.leftArmPivot.rotation.x = -Math.sin(walkTime) * 0.82;
+        yuji.rightArmPivot.rotation.x = Math.sin(walkTime) * 0.82;
+        yuji.leftElbow.rotation.x = -0.35;
+        yuji.rightElbow.rotation.x = -0.35;
+      } else {
+        const bounce = Math.sin(clock.getElapsedTime() * 3.2);
+        yuji.pelvis.position.y = 1.6 + bounce * 0.04;
+        yuji.torso.rotation.y = Math.sin(clock.getElapsedTime() * 1.6) * 0.06;
+        yuji.torso.rotation.x = 0.08;
+
+        yuji.leftArmPivot.rotation.x = THREE.MathUtils.lerp(yuji.leftArmPivot.rotation.x, -0.42, 0.2);
+        yuji.leftArmPivot.rotation.y = 0.25;
+        yuji.leftElbow.rotation.x = THREE.MathUtils.lerp(yuji.leftElbow.rotation.x, -0.65, 0.2);
+
+        yuji.rightArmPivot.rotation.x = THREE.MathUtils.lerp(yuji.rightArmPivot.rotation.x, -0.42, 0.2);
+        yuji.rightArmPivot.rotation.y = -0.25;
+        yuji.rightElbow.rotation.x = THREE.MathUtils.lerp(yuji.rightElbow.rotation.x, -0.65, 0.2);
+
+        yuji.leftLegPivot.rotation.x = -0.15;
+        yuji.rightLegPivot.rotation.x = 0.15;
+        yuji.leftKnee.rotation.x = -0.1;
+        yuji.rightKnee.rotation.x = -0.1;
+      }
+
+      // Shockwave rings decay
+      for (let i = activeShockwaves.length - 1; i >= 0; i--) {
+        const sw = activeShockwaves[i];
+        sw.life -= dt;
+        const progress = 1 - (sw.life / sw.maxLife);
+        const scaleVal = 1 + progress * sw.growth;
+        sw.mesh.scale.set(scaleVal, scaleVal, scaleVal);
+        sw.mesh.material.opacity = Math.max(0, (sw.life / sw.maxLife) * 0.95);
+
+        if (sw.life <= 0) {
+          shockwaveGroup.remove(sw.mesh);
+          sw.mesh.geometry.dispose();
+          sw.mesh.material.dispose();
+          activeShockwaves.splice(i, 1);
+        }
+      }
+
+      // Black Flash lightning decay
+      for (let i = activeLightning.length - 1; i >= 0; i--) {
+        const item = activeLightning[i];
+        item.life -= dt;
+        if (item.life <= 0) {
+          lightningGroup.remove(item.mesh);
+          item.mesh.geometry.dispose();
+          activeLightning.splice(i, 1);
+        } else {
+          item.mesh.scale.multiplyScalar(1.02);
+        }
+      }
+
+      // Arena Debris Physics
+      for (let i = activeDebris.length - 1; i >= 0; i--) {
+        const deb = activeDebris[i];
+        deb.life -= dt;
+        deb.vel.y -= 28 * dt;
+        deb.mesh.position.addScaledVector(deb.vel, dt);
+        deb.mesh.rotation.x += deb.rot.x * dt;
+        deb.mesh.rotation.y += deb.rot.y * dt;
+
+        if (deb.mesh.position.y <= 0.1) {
+          deb.mesh.position.y = 0.1;
+          deb.vel.y *= -0.4;
+          deb.vel.x *= 0.7;
+          deb.vel.z *= 0.7;
+        }
+
+        if (deb.life <= 0) {
+          debrisGroup.remove(deb.mesh);
+          deb.mesh.geometry.dispose();
+          activeDebris.splice(i, 1);
+        }
+      }
+
+      // Camera Orbit & Shift Lock Offset
+      const camDist = state.camera.dist * (state.player.inZone ? 0.9 : 1.0);
+      const camTarget = yuji.root.position.clone().add(state.camera.targetOffset);
+
+      if (state.shiftLock) {
+        const shoulderOffset = new THREE.Vector3(Math.cos(state.camera.yaw), 0, -Math.sin(state.camera.yaw)).multiplyScalar(1.2);
+        camTarget.add(shoulderOffset);
+      }
+
+      const cx = camTarget.x + Math.sin(state.camera.yaw) * Math.cos(state.camera.pitch) * camDist;
+      const cy = camTarget.y + Math.sin(state.camera.pitch) * camDist;
+      const cz = camTarget.z + Math.cos(state.camera.yaw) * Math.cos(state.camera.pitch) * camDist;
+
+      camera.position.set(cx, cy, cz);
+
+      if (state.camera.shake > 0) {
+        state.camera.shake = Math.max(0, state.camera.shake - dt * 2.8);
+        camera.position.x += (Math.random() - 0.5) * state.camera.shake;
+        camera.position.y += (Math.random() - 0.5) * state.camera.shake;
+        camera.position.z += (Math.random() - 0.5) * state.camera.shake;
+      }
+
+      camera.lookAt(camTarget);
+
+      renderer.render(scene, camera);
+    }
+
+    function handleResize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+      if (speedCanvas) {
+        speedCanvas.width = width;
+        speedCanvas.height = height;
+      }
+
+      const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      if (joystick) {
+        joystick.style.display = isTouchDevice ? 'flex' : 'none';
+      }
+    }
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(handleResize, 100);
+      setTimeout(handleResize, 300);
+    });
+
+    window.onload = function() {
+      handleResize();
+      updateHotbarLabels();
+      updatePlayerUI();
+      updateEnemyUI();
+      updateAwakeningUI();
+      animate();
+    };
+  </script>
+</body>
+</html>
