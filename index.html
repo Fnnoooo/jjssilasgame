@@ -7,9 +7,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Three.js 3D Engine -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- Tone.js for Real-Time Procedural Sound Design -->
+  <!-- Tone.js Procedural Sound Design -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-  <!-- Anime Fonts -->
+  <!-- PeerJS for GitHub Pages Serverless WebRTC Multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Black+Ops+One&family=Rajdhani:wght@600;700;900&display=swap" rel="stylesheet">
@@ -25,7 +26,7 @@
       -webkit-user-select: none;
       touch-action: none;
       font-family: 'Rajdhani', sans-serif;
-      background: #7ec0ee;
+      background: #030712;
     }
     #canvas-container {
       width: 100%;
@@ -147,6 +148,16 @@
       transition: opacity 0.35s ease, transform 0.35s ease !important;
     }
 
+    /* Hide desktop hotbar jump, guard, and dash buttons on touch/mobile devices */
+    @media (hover: none) and (pointer: coarse) {
+      .mobile-hide-hotbar {
+        display: none !important;
+      }
+    }
+    .mobile-controls-active .mobile-hide-hotbar {
+      display: none !important;
+    }
+
     @media (max-height: 540px) {
       .compact-top-hud {
         transform: scale(0.72) translateX(-69%) !important;
@@ -165,13 +176,16 @@
     }
   </style>
 </head>
-<body class="relative w-full h-full bg-[#7ec0ee] select-none overflow-hidden touch-none">
+<body class="relative w-full h-full bg-[#030712] select-none overflow-hidden touch-none">
+  <!-- 3D Canvas Viewport -->
   <div id="canvas-container" class="absolute inset-0 z-0 touch-none"></div>
 
+  <!-- Speed Lines and Impact FX -->
   <canvas id="speed-lines-canvas"></canvas>
   <div id="impact-overlay" class="absolute inset-0 pointer-events-none z-30 opacity-0 transition-opacity duration-75"></div>
   <div id="zone-overlay" class="absolute inset-0 pointer-events-none z-20 opacity-0 transition-opacity duration-300 black-flash-vignette"></div>
 
+  <!-- Cinematic Bars & Awakening Title Box -->
   <div id="cinematic-top" class="cinematic-bar-top"></div>
   <div id="cinematic-bottom" class="cinematic-bar-bottom"></div>
 
@@ -182,12 +196,74 @@
     <div class="w-32 h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent mt-2"></div>
   </div>
 
+  <!-- Crosshair Reticle -->
   <div id="crosshair-el" class="shift-lock-crosshair z-20 flex items-center justify-center pointer-events-none">
     <div id="reticle-dot" class="reticle-dot w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_#ef4444] transition-all"></div>
     <div id="reticle-bracket-l" class="hidden absolute -left-2.5 w-1 h-3 border-l-2 border-cyan-400"></div>
     <div id="reticle-bracket-r" class="hidden absolute -right-2.5 w-1 h-3 border-r-2 border-cyan-400"></div>
   </div>
 
+  <!-- MAIN MENU & MULTIPLAYER LOBBY OVERLAY -->
+  <div id="main-menu-overlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-950/90 backdrop-blur-md transition-opacity duration-300 p-4">
+    <div class="max-w-md w-full flex flex-col items-center text-center gap-4 bg-gray-900/90 border border-red-900/50 p-6 sm:p-8 rounded-2xl shadow-[0_0_40px_rgba(220,38,38,0.25)]">
+      <div class="flex flex-col items-center">
+        <span class="combat-font text-red-500 text-sm tracking-[0.3em] font-bold uppercase drop-shadow">JUJUTSU BRAWLER</span>
+        <h1 class="jjs-font text-3xl sm:text-4xl font-black text-white tracking-wider uppercase text-transparent bg-clip-text bg-gradient-to-b from-white via-red-400 to-red-600 drop-shadow-[0_0_20px_#dc2626]">
+          SHENANIGANS
+        </h1>
+        <span class="text-gray-400 text-xs font-semibold tracking-widest uppercase mt-1">YUJI ITADORI - BEACH ISLAND EDITION</span>
+      </div>
+
+      <!-- Initial Choice Screen -->
+      <div id="menu-primary-actions" class="w-full flex flex-col gap-3 mt-2">
+        <button id="btn-menu-solo" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold combat-font text-lg tracking-wider uppercase shadow-[0_0_15px_rgba(239,68,68,0.4)] active:scale-95 transition-all">
+          PLAY SOLO (PRACTICE AI)
+        </button>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button id="btn-menu-create" class="py-2.5 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-cyan-300 font-bold combat-font text-base tracking-wider uppercase shadow active:scale-95 transition-all flex flex-col items-center justify-center">
+            <span>CREATE ROOM</span>
+            <span class="text-[9px] text-gray-400 font-sans tracking-normal">HOST 1v1 MATCH</span>
+          </button>
+          <button id="btn-menu-join-toggle" class="py-2.5 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-amber-300 font-bold combat-font text-base tracking-wider uppercase shadow active:scale-95 transition-all flex flex-col items-center justify-center">
+            <span>JOIN ROOM</span>
+            <span class="text-[9px] text-gray-400 font-sans tracking-normal">ENTER CODE</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Host Lobby Box -->
+      <div id="menu-host-box" class="w-full flex-col items-center gap-3 bg-gray-950/80 p-4 rounded-xl border border-cyan-800/40 hidden">
+        <span class="text-xs text-cyan-400 font-bold uppercase tracking-wider">YOUR MULTIPLAYER ROOM CODE</span>
+        <div class="flex items-center gap-2">
+          <span id="room-code-display" class="jjs-font text-3xl font-black text-white tracking-widest bg-gray-900 px-4 py-1.5 rounded-lg border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">----</span>
+          <button id="btn-copy-code" class="bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 text-cyan-300 px-3 py-2 rounded-lg text-xs font-bold transition active:scale-95">COPY</button>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+          <span>Waiting for rival to connect via GitHub Pages...</span>
+        </div>
+        <button id="btn-host-cancel" class="text-xs text-gray-500 hover:text-gray-300 underline mt-1">CANCEL</button>
+      </div>
+
+      <!-- Join Room Box -->
+      <div id="menu-join-box" class="w-full flex-col items-center gap-3 bg-gray-950/80 p-4 rounded-xl border border-amber-800/40 hidden">
+        <span class="text-xs text-amber-400 font-bold uppercase tracking-wider">ENTER 4-DIGIT ROOM CODE</span>
+        <input id="input-room-code" type="text" maxlength="6" placeholder="e.g. 8421" class="w-48 bg-gray-900 border border-amber-500/60 rounded-lg py-2 px-3 text-center text-xl jjs-font text-white tracking-widest placeholder-gray-600 focus:outline-none focus:border-amber-400">
+        <div class="flex gap-2 w-full">
+          <button id="btn-join-submit" class="flex-1 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-black font-black combat-font text-base tracking-wider uppercase transition active:scale-95 shadow">CONNECT</button>
+          <button id="btn-join-cancel" class="px-3 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-xs font-bold transition">BACK</button>
+        </div>
+        <span id="join-status-text" class="text-[11px] text-gray-400">Enter code provided by the host</span>
+      </div>
+
+      <div class="text-[10px] text-gray-500 leading-tight">
+        Serverless P2P WebRTC Powered &bull; No Server Setup Required &bull; Play Directly on GitHub Pages
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Combat HUD -->
   <div id="game-hud-wrapper" class="absolute inset-0 pointer-events-none z-20 transition-all duration-300">
     <div class="compact-top-hud absolute top-2 left-1/2 -translate-x-1/2 z-20 w-[92vw] max-w-sm flex flex-col gap-1 pointer-events-none scale-85 sm:scale-95 origin-top transition-transform">
       <!-- Player HP Bar -->
@@ -196,6 +272,7 @@
           <div class="flex items-center gap-1.5">
             <span class="jjs-font text-red-400 text-[11px] tracking-wider">YUJI ITADORI</span>
             <span id="player-state-text" class="text-[8px] text-gray-400 font-bold">READY</span>
+            <span id="player-stun-tag" class="hidden text-[7px] bg-yellow-500 text-black font-black px-1 rounded shadow">STUNNED</span>
             <span id="zone-badge" class="hidden text-[7px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded shadow-[0_0_8px_#ef4444] tracking-wider">120% AWAKENED</span>
           </div>
           <span id="player-hp-num" class="text-red-400 font-mono text-[9px] font-bold">100 / 100</span>
@@ -205,12 +282,13 @@
         </div>
       </div>
 
-      <!-- Enemy HP Bar -->
+      <!-- Enemy / Opponent HP Bar -->
       <div id="enemy-card" class="bg-gray-950/85 backdrop-blur-md px-2.5 py-1.5 rounded-lg border border-purple-900/40 shadow-xl flex flex-col gap-1">
         <div class="flex justify-between items-center text-[10px] font-bold text-gray-200 leading-none">
           <div class="flex items-center gap-1.5">
-            <span class="jjs-font text-purple-400 text-[11px] tracking-wider">MAHITO</span>
+            <span id="enemy-name-label" class="jjs-font text-purple-400 text-[11px] tracking-wider">MAHITO (AI)</span>
             <span id="enemy-stun-tag" class="hidden text-[7px] bg-yellow-600 text-black font-bold px-1 rounded">STUNNED</span>
+            <span id="enemy-guardbreak-tag" class="hidden text-[7px] bg-cyan-400 text-black font-black px-1 rounded animate-pulse">GUARD BROKEN</span>
             <span id="enemy-ragdoll-tag" class="hidden text-[7px] bg-blue-600 text-white font-bold px-1 rounded">DOWNED (IMMUNE)</span>
           </div>
           <span id="enemy-hp-num" class="text-purple-400 font-mono text-[9px] font-bold">100%</span>
@@ -246,6 +324,7 @@
       </div>
     </div>
 
+    <!-- Bottom Hotbar (Jump, Guard, and Dash are .mobile-hide-hotbar to streamline mobile view) -->
     <div class="compact-hotbar absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1 w-full px-1 scale-90 sm:scale-100 origin-bottom pointer-events-auto transition-transform">
       <div id="chain-window-indicator" class="opacity-0 transition-opacity duration-100 flex items-center gap-1.5 bg-red-950/95 text-red-200 border border-red-500 px-3 py-0.5 rounded-full shadow-[0_0_14px_#dc2626]">
         <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
@@ -294,20 +373,20 @@
           <div id="cd-4" class="absolute inset-0 bg-black/85 rounded-lg flex items-center justify-center text-[10px] font-bold text-red-400 font-mono hidden">5.0</div>
         </button>
 
-        <!-- Q: Dash -->
-        <button id="btn-dash" class="relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-gray-700 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-gray-400 shrink-0">
+        <!-- Q: Dash (Hidden on mobile hotbar, replaced by dedicated mobile dash button) -->
+        <button id="btn-dash" class="mobile-hide-hotbar relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-gray-700 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-gray-400 shrink-0">
           <span class="text-[6px] text-gray-400 font-bold uppercase leading-none">Q</span>
           <span class="text-[8px] font-black text-gray-200 combat-font leading-none">DASH</span>
         </button>
 
-        <!-- Space: Jump / Downslam Prep -->
-        <button id="btn-jump" class="relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-emerald-800 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-emerald-400 shrink-0">
+        <!-- Space: Jump (Hidden on mobile hotbar, replaced by dedicated mobile jump button) -->
+        <button id="btn-jump" class="mobile-hide-hotbar relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-emerald-800 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-emerald-400 shrink-0">
           <span class="text-[6px] text-emerald-400 font-bold uppercase leading-none">SPC</span>
           <span class="text-[8px] font-black text-emerald-300 combat-font leading-none">JUMP</span>
         </button>
 
-        <!-- F: Guard -->
-        <button id="btn-block" class="relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-blue-900 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-blue-500 shrink-0">
+        <!-- F: Guard (Hidden on mobile hotbar, replaced by dedicated mobile guard button) -->
+        <button id="btn-block" class="mobile-hide-hotbar relative group w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-900 border border-blue-900 flex flex-col items-center justify-center transition-all active:scale-90 hover:border-blue-500 shrink-0">
           <span class="text-[6px] text-blue-400 font-bold uppercase leading-none">F</span>
           <span class="text-[8px] font-black text-blue-300 combat-font leading-none">GUARD</span>
         </button>
@@ -329,21 +408,54 @@
 
     <!-- Top Right Utility Buttons -->
     <div class="absolute top-2 right-2 z-20 flex items-center gap-1.5 scale-85 sm:scale-95 origin-top-right pointer-events-auto">
+      <button id="btn-menu-return" class="bg-gray-900/85 backdrop-blur-md px-2.5 py-1 rounded-md border border-gray-700 text-[8px] text-gray-300 font-bold hover:bg-gray-800 transition active:scale-95 shadow">
+        Menu
+      </button>
       <button id="btn-sound" class="bg-gray-900/85 backdrop-blur-md px-2 py-1 rounded-md border border-gray-700 text-[10px] text-gray-200 font-bold hover:bg-gray-800 transition active:scale-95 shadow">
         <span id="sound-icon">🔊</span>
       </button>
       <button id="btn-dummy-mode" class="bg-purple-950/90 backdrop-blur-md px-2.5 py-1 rounded-md border border-purple-600 text-[8px] text-purple-200 font-bold hover:bg-purple-900 transition active:scale-95 shadow flex items-center gap-1">
         <span>AI:</span> <span id="dummy-mode-text" class="text-green-400 font-black">SANDBAG</span>
       </button>
-      <button id="btn-reset-dummy" class="bg-red-950/85 backdrop-blur-md px-2 py-1 rounded-md border border-red-800 text-[8px] text-red-200 font-bold hover:bg-red-900 transition active:scale-95 shadow">
+      <button id="btn-reset-dummy" class="bg-red-950/85 backdrop-blur-md px-2.5 py-1 rounded-md border border-red-800 text-[8px] text-red-200 font-bold hover:bg-red-900 transition active:scale-95 shadow">
         Respawn
       </button>
     </div>
   </div>
 
-  <!-- Mobile Touch Virtual Joystick -->
-  <div id="mobile-controls" class="mobile-joy-container absolute bottom-4 left-4 z-30 w-16 h-16 rounded-full border border-gray-700/60 bg-black/45 touch-none flex items-center justify-center pointer-events-auto transition-transform">
+  <!-- Mobile Touch Virtual Joystick (Left Thumb) -->
+  <div id="mobile-controls" class="mobile-joy-container absolute bottom-4 left-4 z-30 w-16 h-16 rounded-full border border-gray-700/60 bg-black/45 touch-none flex items-center justify-center pointer-events-auto transition-transform hidden">
     <div id="joystick-knob" class="mobile-joy-knob w-6 h-6 rounded-full bg-red-600/80 border border-red-400 shadow pointer-events-none"></div>
+  </div>
+
+  <!-- Dedicated Mobile Dash Button (Right Thumb Upper-Left) -->
+  <div id="mobile-dash-btn" class="absolute bottom-24 right-20 z-30 w-13 h-13 sm:w-14 sm:h-14 rounded-full border-2 border-gray-500/80 bg-gray-950/75 backdrop-blur-sm touch-none flex flex-col items-center justify-center pointer-events-auto shadow-[0_0_14px_rgba(156,163,175,0.4)] active:scale-90 transition-transform hidden">
+    <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+    </svg>
+    <span class="text-[7px] font-black text-gray-200 combat-font tracking-wider mt-0.5">DASH</span>
+  </div>
+
+  <!-- Dedicated Mobile M1 Punch Button (Right Thumb Upper-Right) -->
+  <div id="mobile-m1-btn" class="absolute bottom-24 right-4 z-30 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-red-500/80 bg-red-950/70 backdrop-blur-sm touch-none flex flex-col items-center justify-center pointer-events-auto shadow-[0_0_16px_rgba(239,68,68,0.5)] active:scale-90 transition-transform hidden">
+    <span class="text-[11px] font-black text-white combat-font tracking-wider">M1</span>
+    <span class="text-[7px] font-black text-red-300 uppercase leading-none">PUNCH</span>
+  </div>
+
+  <!-- Dedicated Mobile Guard / Block Button (Right Thumb Lower-Left) -->
+  <div id="mobile-guard-btn" class="absolute bottom-5 right-20 z-30 w-13 h-13 sm:w-14 sm:h-14 rounded-full border-2 border-blue-500/80 bg-blue-950/70 backdrop-blur-sm touch-none flex flex-col items-center justify-center pointer-events-auto shadow-[0_0_14px_rgba(59,130,246,0.45)] active:scale-90 transition-transform hidden">
+    <svg class="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 2.18l6 2.25v4.66c0 4.14-2.73 8.01-6 9.08-3.27-1.07-6-4.94-6-9.08V6.43l6-2.25z"/>
+    </svg>
+    <span class="text-[7px] font-black text-blue-300 combat-font tracking-wider mt-0.5">GUARD</span>
+  </div>
+
+  <!-- Dedicated Mobile Jump Button (Right Thumb Lower-Right) -->
+  <div id="mobile-jump-btn" class="absolute bottom-5 right-4 z-30 w-13 h-13 sm:w-14 sm:h-14 rounded-full border-2 border-emerald-500/80 bg-emerald-950/70 backdrop-blur-sm touch-none flex flex-col items-center justify-center pointer-events-auto shadow-[0_0_14px_rgba(16,185,129,0.4)] active:scale-90 transition-transform hidden">
+    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+    <span class="text-[7px] font-black text-emerald-300 combat-font tracking-wider mt-0.5">JUMP</span>
   </div>
 
   <script>
@@ -359,6 +471,7 @@
     let slashSynth = null;
     let cinematicDrone = null;
     let heartbeatSynth = null;
+    let blockBreakSynth = null;
 
     let ostKick = null;
     let ostBass = null;
@@ -408,6 +521,11 @@
           lightningNoise = new Tone.NoiseSynth({
             noise: { type: 'pink' },
             envelope: { attack: 0.002, decay: 0.4, sustain: 0 }
+          }).connect(masterVolume);
+
+          blockBreakSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 }
           }).connect(masterVolume);
 
           slashSynth = new Tone.NoiseSynth({
@@ -530,6 +648,18 @@
       } catch (e) {}
     }
 
+    function playBlockBreakSound() {
+      if (!audioInitialized) return;
+      try {
+        if (blockBreakSynth) {
+          blockBreakSynth.triggerAttackRelease(['E5', 'B5', 'F#6'], '16n');
+        }
+        if (heavyImpactSynth) {
+          heavyImpactSynth.triggerAttackRelease('C1', '8n', '+0.02');
+        }
+      } catch (e) {}
+    }
+
     function playBlackFlashSound(chainCount = 1) {
       if (!audioInitialized) return;
       try {
@@ -568,30 +698,51 @@
 
     function createProceduralSandTexture() {
       const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
+      canvas.width = 1024;
+      canvas.height = 1024;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#e8d5a7';
-      ctx.fillRect(0, 0, 512, 512);
+      
+      const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
+      grad.addColorStop(0, '#e8d2a2');
+      grad.addColorStop(0.5, '#dfc491');
+      grad.addColorStop(1, '#d5b780');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1024, 1024);
 
-      // Fine grain noise
-      for (let i = 0; i < 45000; i++) {
-        const x = Math.random() * 512;
-        const y = Math.random() * 512;
-        const shade = Math.random() > 0.5 ? 245 : 205;
-        const alpha = 0.07 + Math.random() * 0.12;
-        ctx.fillStyle = `rgba(${shade}, ${shade - 20}, ${shade - 50}, ${alpha})`;
+      for (let i = 0; i < 90000; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        const bright = Math.random() > 0.45;
+        const r = bright ? 245 + Math.random() * 10 : 190 + Math.random() * 25;
+        const g = r - 22;
+        const b = r - 52;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.12 + Math.random() * 0.18})`;
+        ctx.fillRect(x, y, 1.8, 1.8);
+      }
+
+      for (let i = 0; i < 4000; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
         ctx.fillRect(x, y, 1.5, 1.5);
       }
 
-      // Gentle wind ripples
-      ctx.strokeStyle = 'rgba(210, 185, 130, 0.22)';
-      ctx.lineWidth = 3;
-      for (let y = 0; y < 512; y += 18) {
+      for (let y = 0; y < 1024; y += 14) {
+        ctx.strokeStyle = 'rgba(165, 130, 80, 0.22)';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
         ctx.moveTo(0, y);
-        for (let x = 0; x <= 512; x += 32) {
-          ctx.lineTo(x, y + Math.sin(x * 0.05) * 4);
+        for (let x = 0; x <= 1024; x += 32) {
+          ctx.lineTo(x, y + Math.sin(x * 0.035) * 5 + Math.cos(x * 0.08) * 2);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255, 245, 215, 0.18)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, y + 2.5);
+        for (let x = 0; x <= 1024; x += 32) {
+          ctx.lineTo(x, y + 2.5 + Math.sin(x * 0.035) * 5 + Math.cos(x * 0.08) * 2);
         }
         ctx.stroke();
       }
@@ -599,89 +750,142 @@
       const tex = new THREE.CanvasTexture(canvas);
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(8, 8);
+      tex.repeat.set(12, 12);
       return tex;
     }
 
     function createProceduralBarkTexture() {
       const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 256;
+      canvas.width = 512;
+      canvas.height = 512;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#7a5230';
-      ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#6e4524';
+      ctx.fillRect(0, 0, 512, 512);
 
-      // Horizontal segment rings of palm tree bark
-      for (let y = 0; y < 256; y += 14) {
-        ctx.fillStyle = '#55361b';
-        ctx.fillRect(0, y, 256, 4);
-        ctx.fillStyle = '#94663e';
-        ctx.fillRect(0, y + 4, 256, 3);
+      for (let y = 0; y < 512; y += 16) {
+        ctx.fillStyle = '#4a2c14';
+        ctx.fillRect(0, y, 512, 6);
+        ctx.fillStyle = '#8f5f37';
+        ctx.fillRect(0, y + 6, 512, 4);
+        ctx.fillStyle = '#b57c4c';
+        ctx.fillRect(0, y + 10, 512, 2);
       }
-      for (let i = 0; i < 3000; i++) {
-        const x = Math.random() * 256;
-        const y = Math.random() * 256;
-        ctx.fillStyle = 'rgba(40, 22, 10, 0.18)';
-        ctx.fillRect(x, y, 2, 2);
+      for (let i = 0; i < 8000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        ctx.fillStyle = 'rgba(30, 15, 5, 0.28)';
+        ctx.fillRect(x, y, 2.5, 2.5);
       }
 
       const tex = new THREE.CanvasTexture(canvas);
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(1, 4);
+      tex.repeat.set(1, 6);
       return tex;
     }
 
     function createProceduralPalmLeafTexture() {
       const canvas = document.createElement('canvas');
-      canvas.width = 128;
+      canvas.width = 256;
       canvas.height = 512;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#2d8028';
-      ctx.fillRect(0, 0, 128, 512);
+      ctx.fillStyle = '#2d7c26';
+      ctx.fillRect(0, 0, 256, 512);
 
-      // Center stem vein
-      ctx.fillStyle = '#9fd64b';
-      ctx.fillRect(60, 0, 8, 512);
+      const stemGrad = ctx.createLinearGradient(120, 0, 136, 0);
+      stemGrad.addColorStop(0, '#86bb3d');
+      stemGrad.addColorStop(0.5, '#c5ea70');
+      stemGrad.addColorStop(1, '#86bb3d');
+      ctx.fillStyle = stemGrad;
+      ctx.fillRect(124, 0, 8, 512);
 
-      // Angled leaf blade strips
-      ctx.strokeStyle = '#1b5a17';
+      ctx.strokeStyle = '#185015';
       ctx.lineWidth = 2;
-      for (let y = 0; y < 512; y += 8) {
+      for (let y = 0; y < 512; y += 6) {
         ctx.beginPath();
-        ctx.moveTo(64, y);
-        ctx.lineTo(8, y + 16);
-        ctx.moveTo(64, y);
-        ctx.lineTo(120, y + 16);
+        ctx.moveTo(128, y);
+        ctx.lineTo(12, y + 26);
+        ctx.moveTo(128, y);
+        ctx.lineTo(244, y + 26);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(165, 220, 75, 0.45)';
+        ctx.beginPath();
+        ctx.moveTo(128, y + 2);
+        ctx.lineTo(20, y + 28);
+        ctx.moveTo(128, y + 2);
+        ctx.lineTo(236, y + 28);
         ctx.stroke();
       }
 
-      const tex = new THREE.CanvasTexture(canvas);
-      return tex;
+      return new THREE.CanvasTexture(canvas);
     }
 
     function createProceduralRockTexture() {
       const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#4d5059';
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let y = 0; y < 512; y += 22) {
+        ctx.fillStyle = (y % 44 === 0) ? '#383a42' : '#5c606b';
+        ctx.fillRect(0, y, 512, 10);
+      }
+
+      for (let i = 0; i < 9000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const c = 55 + Math.random() * 65;
+        ctx.fillStyle = `rgb(${c}, ${c + 3}, ${c + 8})`;
+        ctx.fillRect(x, y, 3, 3);
+      }
+
+      for (let i = 0; i < 30; i++) {
+        const cx = Math.random() * 512;
+        const cy = Math.random() * 512;
+        const r = 12 + Math.random() * 24;
+        const gPat = ctx.createRadialGradient(cx, cy, 2, cx, cy, r);
+        gPat.addColorStop(0, 'rgba(85, 115, 75, 0.6)');
+        gPat.addColorStop(1, 'rgba(85, 115, 75, 0)');
+        ctx.fillStyle = gPat;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(2, 2);
+      return tex;
+    }
+
+    function createProceduralWoodTexture() {
+      const canvas = document.createElement('canvas');
       canvas.width = 256;
       canvas.height = 256;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#5a5b61';
+      ctx.fillStyle = '#827464';
       ctx.fillRect(0, 0, 256, 256);
-
-      for (let i = 0; i < 4000; i++) {
-        const x = Math.random() * 256;
-        const y = Math.random() * 256;
-        const c = 60 + Math.random() * 60;
-        ctx.fillStyle = `rgb(${c}, ${c}, ${c + 4})`;
-        ctx.fillRect(x, y, 2, 2);
+      ctx.strokeStyle = '#5a4f43';
+      ctx.lineWidth = 1.5;
+      for (let y = 0; y < 256; y += 5) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        for (let x = 0; x <= 256; x += 16) {
+          ctx.lineTo(x, y + Math.sin(x * 0.08) * 1.5);
+        }
+        ctx.stroke();
       }
       return new THREE.CanvasTexture(canvas);
     }
 
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x76bced);
-    scene.fog = new THREE.FogExp2(0xb6dcf5, 0.007);
+    scene.background = new THREE.Color(0x60a5fa);
+    scene.fog = new THREE.FogExp2(0x93c5fd, 0.0065);
 
     const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -690,11 +894,10 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.12;
     container.appendChild(renderer.domElement);
 
-    // Warm Tropical Daylight Sun
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.0);
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.2);
     sunLight.position.set(70, 95, -60);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 1024;
@@ -708,11 +911,9 @@
     sunLight.shadow.camera.bottom = -shadowDist;
     scene.add(sunLight);
 
-    // Ambient Tropical Atmosphere (sky blue & warm sand bounce)
-    const ambientLight = new THREE.HemisphereLight(0x87ceeb, 0xdfc999, 1.15);
+    const ambientLight = new THREE.HemisphereLight(0x93c5fd, 0xdfc999, 1.25);
     scene.add(ambientLight);
 
-    // Visible Glowing Sun in the Sky (Sphere only, no floating ring geometries)
     const sunMeshGeo = new THREE.SphereGeometry(7, 16, 16);
     const sunMeshMat = new THREE.MeshBasicMaterial({ color: 0xfffae0 });
     const sunMesh = new THREE.Mesh(sunMeshGeo, sunMeshMat);
@@ -736,36 +937,31 @@
     const barkTexture = createProceduralBarkTexture();
     const leafTexture = createProceduralPalmLeafTexture();
     const rockTexture = createProceduralRockTexture();
+    const woodTexture = createProceduralWoodTexture();
 
     const islandRadius = 38;
 
-    // Heightmap function for natural dunes, hills, and shoreline slope
     function getTerrainHeight(x, z) {
       const dist = Math.hypot(x, z);
-      if (dist > 42) return -4.0; // Deep water drop-off
+      if (dist > 42) return -4.0;
       
-      // Gentle center arena (smooth elevation near 0 for clean combat)
       let h = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.12;
 
-      // North-East rolling sand hill
       const dHill1 = Math.hypot(x - 17, z + 16);
       if (dHill1 < 16) {
         h += Math.cos((dHill1 / 16) * (Math.PI / 2)) * 3.4;
       }
 
-      // South-West coastal dune ridge
       const dHill2 = Math.hypot(x + 19, z - 13);
       if (dHill2 < 15) {
         h += Math.cos((dHill2 / 15) * (Math.PI / 2)) * 2.6;
       }
 
-      // North-West viewing mound
       const dHill3 = Math.hypot(x + 16, z + 18);
       if (dHill3 < 14) {
         h += Math.cos((dHill3 / 14) * (Math.PI / 2)) * 2.2;
       }
 
-      // Smooth shoreline decline dipping naturally into ocean water at radius 33+
       if (dist > 28) {
         const falloff = (dist - 28) / 13;
         h = THREE.MathUtils.lerp(h, -2.8, Math.min(1.0, falloff * falloff));
@@ -774,7 +970,6 @@
       return h;
     }
 
-    // Sculpted seamless Island Terrain (NO hollow caps or floating circle rings)
     const terrainSize = 96;
     const terrainSegments = 90;
     const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegments, terrainSegments);
@@ -790,30 +985,28 @@
 
     const terrainMat = new THREE.MeshStandardMaterial({
       map: sandTexture,
-      roughness: 0.94,
-      metalness: 0.02
+      roughness: 0.88,
+      metalness: 0.04
     });
     const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
     terrainMesh.receiveShadow = true;
     scene.add(terrainMesh);
 
-    // Realistic Moving Ocean Water with Dynamic Waves
     const waterSegments = 120;
     const waterSize = 340;
     const waterGeo = new THREE.PlaneGeometry(waterSize, waterSize, waterSegments, waterSegments);
     const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x0c9eb5,
-      roughness: 0.12,
-      metalness: 0.45,
+      color: 0x0ea5e9,
+      roughness: 0.08,
+      metalness: 0.55,
       transparent: true,
-      opacity: 0.86
+      opacity: 0.88
     });
     const water = new THREE.Mesh(waterGeo, waterMat);
     water.rotation.x = -Math.PI / 2;
-    water.position.y = -0.15; // Set right at natural shoreline
+    water.position.y = -0.15;
     scene.add(water);
 
-    // Store base vertices for realistic wave equations
     const waterPosAttr = waterGeo.attributes.position;
     const waterBaseZ = new Float32Array(waterPosAttr.count);
     for (let i = 0; i < waterPosAttr.count; i++) {
@@ -823,41 +1016,27 @@
     const clamGroup = new THREE.Group();
     scene.add(clamGroup);
 
-    // Clam Shell Material
-    const shellMat = new THREE.MeshStandardMaterial({
-      color: 0xfde8d0,
-      roughness: 0.6,
-      metalness: 0.15
-    });
+    const shellMat = new THREE.MeshStandardMaterial({ color: 0xfde8d0, roughness: 0.5, metalness: 0.18 });
+    const starfishMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.65, metalness: 0.08 });
+    const driftwoodMat = new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.9, metalness: 0.05 });
 
-    // Starfish Material
-    const starfishMat = new THREE.MeshStandardMaterial({
-      color: 0xf97316,
-      roughness: 0.7,
-      metalness: 0.05
-    });
-
-    // Procedural Clam Shell Generator
     function createClam(x, z, scale = 1.0, rotY = 0) {
       const clam = new THREE.Group();
       const groundY = getTerrainHeight(x, z);
       clam.position.set(x, groundY + 0.04, z);
       clam.rotation.y = rotY;
 
-      // Bottom Valve
       const valveGeo = new THREE.CylinderGeometry(0.32 * scale, 0.45 * scale, 0.07 * scale, 8);
       const bottomValve = new THREE.Mesh(valveGeo, shellMat);
       bottomValve.scale.set(1, 1, 0.65);
       bottomValve.castShadow = true;
       clam.add(bottomValve);
 
-      // Top Valve slightly ajar
       const topValve = bottomValve.clone();
       topValve.position.set(0, 0.07 * scale, -0.05 * scale);
       topValve.rotation.x = 0.35;
       clam.add(topValve);
 
-      // Pearl / interior glint inside open clam
       const pearlGeo = new THREE.SphereGeometry(0.08 * scale, 8, 8);
       const pearlMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.8 });
       const pearl = new THREE.Mesh(pearlGeo, pearlMat);
@@ -867,7 +1046,6 @@
       clamGroup.add(clam);
     }
 
-    // Procedural 5-Pointed Starfish Generator
     function createStarfish(x, z, scale = 1.0, rotY = 0) {
       const star = new THREE.Group();
       const groundY = getTerrainHeight(x, z);
@@ -891,7 +1069,45 @@
       clamGroup.add(star);
     }
 
-    // Scatter Clams & Sea Shells along the sandy shoreline
+    function createDriftwood(x, z, scale = 1.0, rotY = 0) {
+      const log = new THREE.Group();
+      const gy = getTerrainHeight(x, z);
+      log.position.set(x, gy + 0.15 * scale, z);
+      log.rotation.set(0.08, rotY, -0.05);
+
+      const logMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * scale, 0.28 * scale, 3.2 * scale, 7), driftwoodMat);
+      logMesh.rotation.z = Math.PI / 2;
+      logMesh.castShadow = true;
+      logMesh.receiveShadow = true;
+      log.add(logMesh);
+
+      const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.15 * scale, 1.2 * scale, 6), driftwoodMat);
+      branch.position.set(0.6 * scale, 0.4 * scale, 0);
+      branch.rotation.set(0.4, 0, 0.8);
+      branch.castShadow = true;
+      log.add(branch);
+
+      scene.add(log);
+    }
+
+    const grassBladeMat = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.7, side: THREE.DoubleSide });
+    function createBeachGrassClump(x, z, scale = 1.0) {
+      const clump = new THREE.Group();
+      const gy = getTerrainHeight(x, z);
+      clump.position.set(x, gy, z);
+
+      for (let i = 0; i < 7; i++) {
+        const bladeGeo = new THREE.PlaneGeometry(0.12 * scale, (0.8 + Math.random() * 0.5) * scale);
+        const blade = new THREE.Mesh(bladeGeo, grassBladeMat);
+        const ang = (i / 7) * Math.PI * 2;
+        blade.position.set(Math.cos(ang) * 0.15 * scale, 0.45 * scale, Math.sin(ang) * 0.15 * scale);
+        blade.rotation.set((Math.random() - 0.5) * 0.35, ang, (Math.random() - 0.5) * 0.35);
+        blade.castShadow = true;
+        clump.add(blade);
+      }
+      scene.add(clump);
+    }
+
     createClam(-12, 18, 1.2, 0.4);
     createClam(-18, 14, 0.9, 1.1);
     createClam(20, -11, 1.3, -0.6);
@@ -901,20 +1117,28 @@
     createClam(-22, -9, 1.25, 0.2);
     createClam(6, -24, 1.0, -0.7);
 
-    // Scatter Colorful Starfish on the beach
     createStarfish(-15, 17, 1.1, 0.3);
     createStarfish(18, -14, 1.25, 1.5);
     createStarfish(-6, 23, 0.95, 2.2);
     createStarfish(21, 9, 1.0, -1.1);
     createStarfish(-21, -12, 1.2, 0.8);
 
-    // Procedural 3D Palm Trees (elevated onto hills and dunes)
+    createDriftwood(-16, 21, 1.1, 0.8);
+    createDriftwood(19, 16, 0.95, -1.2);
+    createDriftwood(-22, -14, 1.2, 2.1);
+
+    createBeachGrassClump(-14, 15, 1.2);
+    createBeachGrassClump(-18, 19, 1.0);
+    createBeachGrassClump(15, -13, 1.3);
+    createBeachGrassClump(21, -15, 1.1);
+    createBeachGrassClump(12, 23, 1.2);
+    createBeachGrassClump(-19, -8, 1.0);
+
     function createPalmTree(x, z, scale = 1.0, curveAngle = 0.2) {
       const treeGroup = new THREE.Group();
       const baseHeight = getTerrainHeight(x, z);
       treeGroup.position.set(x, baseHeight, z);
 
-      // Curved Trunk
       const trunkMat = new THREE.MeshStandardMaterial({ map: barkTexture, roughness: 0.85 });
       const trunkSegments = 7;
       let prevPart = treeGroup;
@@ -939,12 +1163,10 @@
         prevPart = pivot;
       }
 
-      // Palm Crown & Fronds
       const crown = new THREE.Group();
       crown.position.y = segmentHeight;
       prevPart.add(crown);
 
-      // Coconuts
       const coconutMat = new THREE.MeshStandardMaterial({ color: 0x4a2e16, roughness: 0.8 });
       for (let c = 0; c < 3; c++) {
         const cMesh = new THREE.Mesh(new THREE.SphereGeometry(0.25 * scale, 6, 6), coconutMat);
@@ -953,7 +1175,6 @@
         crown.add(cMesh);
       }
 
-      // Arching Palm Fronds
       const leafMat = new THREE.MeshStandardMaterial({
         map: leafTexture,
         side: THREE.DoubleSide,
@@ -967,7 +1188,6 @@
         frondPivot.rotation.y = frondAngle;
 
         const leafGeo = new THREE.PlaneGeometry(0.9 * scale, 3.8 * scale, 3, 8);
-        // Arch the leaf downward
         const pos = leafGeo.attributes.position;
         for (let p = 0; p < pos.count; p++) {
           const yVal = pos.getY(p);
@@ -987,7 +1207,6 @@
       scene.add(treeGroup);
     }
 
-    // Place Palm Trees around dunes and coastal hills
     const palmLocations = [
       { x: -24, z: -16, s: 1.1, c: 0.4 },
       { x: 22, z: -18, s: 1.25, c: -0.3 },
@@ -997,12 +1216,11 @@
       { x: 14, z: -27, s: 1.3, c: -0.4 },
       { x: -16, z: 25, s: 1.1, c: 0.5 },
       { x: 18, z: 24, s: 1.2, c: -0.3 },
-      { x: 17, z: -16, s: 1.35, c: -0.25 }, // Top of dune
-      { x: -18, z: 15, s: 1.2, c: 0.35 }    // Top of hill
+      { x: 17, z: -16, s: 1.35, c: -0.25 },
+      { x: -18, z: 15, s: 1.2, c: 0.35 }
     ];
     palmLocations.forEach(p => createPalmTree(p.x, p.z, p.s, p.c));
 
-    // Coastal Rocks around the shore and on hill slopes
     const rockMat = new THREE.MeshStandardMaterial({ map: rockTexture, roughness: 0.85, metalness: 0.1 });
     function placeCoastalRock(x, z, sx, sy, sz) {
       const rockGeo = new THREE.DodecahedronGeometry(1.4, 1);
@@ -1022,8 +1240,8 @@
     placeCoastalRock(0, -29, 2.5, 1.2, 2.1);
     placeCoastalRock(6, -28, 1.7, 1.0, 1.5);
     placeCoastalRock(-4, 28, 2.8, 1.3, 2.2);
-    placeCoastalRock(15, 14, 1.9, 1.4, 1.8); // Hill rock
-    placeCoastalRock(-14, -15, 2.1, 1.5, 1.9); // Dune rock
+    placeCoastalRock(15, 14, 1.9, 1.4, 1.8);
+    placeCoastalRock(-14, -15, 2.1, 1.5, 1.9);
 
     function createDetailedFighter(isYuji = true) {
       const root = new THREE.Group();
@@ -1039,6 +1257,11 @@
       const beltMat = new THREE.MeshStandardMaterial({
         color: 0x0a0c12,
         roughness: 0.5
+      });
+      const buckleMat = new THREE.MeshStandardMaterial({
+        color: 0xd1d5db,
+        metalness: 0.85,
+        roughness: 0.2
       });
       const shoeMat = new THREE.MeshStandardMaterial({
         color: isYuji ? 0xb91c1c : 0x111625,
@@ -1056,20 +1279,25 @@
         color: isYuji ? 0x24141c : 0x485869,
         roughness: 0.8
       });
+      const wrapMat = new THREE.MeshStandardMaterial({
+        color: 0xdedede,
+        roughness: 0.9
+      });
 
-      // Pelvis / Hips
       const pelvisGeo = new THREE.BoxGeometry(0.86, 0.44, 0.54);
       const pelvis = new THREE.Mesh(pelvisGeo, uniformMat);
       pelvis.castShadow = true;
       pelvis.position.y = 1.6;
       root.add(pelvis);
 
-      // Belt
       const belt = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.1, 0.56), beltMat);
       belt.position.y = 0.18;
       pelvis.add(belt);
 
-      // Torso
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.05), buckleMat);
+      buckle.position.set(0, 0.18, 0.29);
+      pelvis.add(buckle);
+
       const torsoGeo = new THREE.BoxGeometry(0.96, 0.98, 0.58);
       const torso = new THREE.Mesh(torsoGeo, uniformMat);
       torso.castShadow = true;
@@ -1077,41 +1305,39 @@
       pelvis.add(torso);
 
       if (isYuji) {
-        // Red Hood Collar & Fold
-        const hoodCollarGeo = new THREE.BoxGeometry(0.78, 0.28, 0.64);
+        const hoodCollarGeo = new THREE.BoxGeometry(0.82, 0.32, 0.66);
         const hoodMat = new THREE.MeshStandardMaterial({ color: 0xba1818, roughness: 0.65 });
         const hoodCollar = new THREE.Mesh(hoodCollarGeo, hoodMat);
         hoodCollar.position.set(0, 0.44, 0.02);
         torso.add(hoodCollar);
 
-        // Hanging Hood back pouch
-        const hoodBackGeo = new THREE.BoxGeometry(0.54, 0.4, 0.24);
+        const hoodBackGeo = new THREE.BoxGeometry(0.58, 0.45, 0.26);
         const hoodBack = new THREE.Mesh(hoodBackGeo, hoodMat);
         hoodBack.position.set(0, 0.32, -0.34);
         hoodBack.rotation.x = -0.25;
         torso.add(hoodBack);
 
-        // Gold Jujutsu High button
-        const buttonGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.06, 12);
-        const buttonMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.25 });
+        const buttonGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.06, 12);
+        const buttonMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.2 });
         const button = new THREE.Mesh(buttonGeo, buttonMat);
         button.rotation.x = Math.PI / 2;
-        button.position.set(0, 0.22, 0.31);
+        button.position.set(0.12, 0.22, 0.31);
         torso.add(button);
       } else {
-        // Mahito's Stitches on Torso
-        const stitchMat = new THREE.MeshBasicMaterial({ color: 0x1f242d });
-        const bodyStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.025), stitchMat);
+        const stitchMat = new THREE.MeshBasicMaterial({ color: 0x222a36 });
+        const bodyStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.03), stitchMat);
         bodyStitchH.position.set(0.12, 0.1, 0.3);
         torso.add(bodyStitchH);
         for (let st = -2; st <= 2; st++) {
-          const cross = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.07), stitchMat);
-          cross.position.set(0.12 + st * 0.09, 0.1, 0.302);
-          torso.add(cross);
+          const cross1 = new THREE.Mesh(new THREE.PlaneGeometry(0.025, 0.08), stitchMat);
+          cross1.position.set(0.12 + st * 0.1, 0.1, 0.302);
+          torso.add(cross1);
+          const cross2 = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.025), stitchMat);
+          cross2.position.set(0.12 + st * 0.1, 0.1, 0.302);
+          torso.add(cross2);
         }
       }
 
-      // Head Pivot & Head
       const headPivot = new THREE.Group();
       headPivot.position.y = 0.56;
       torso.add(headPivot);
@@ -1122,26 +1348,23 @@
       head.castShadow = true;
       headPivot.add(head);
 
-      // Hair Base
-      const hairBaseGeo = new THREE.BoxGeometry(0.6, 0.28, 0.6);
+      const hairBaseGeo = new THREE.BoxGeometry(0.62, 0.3, 0.62);
       const hairBase = new THREE.Mesh(hairBaseGeo, isYuji ? hairDarkMat : hairMat);
       hairBase.position.y = 0.26;
       head.add(hairBase);
 
       if (isYuji) {
-        // Multi-point Yuji Two-Tone Spikes
-        const spikeGeo = new THREE.ConeGeometry(0.13, 0.34, 4);
-        for (let s = 0; s < 8; s++) {
+        const spikeGeo = new THREE.ConeGeometry(0.14, 0.36, 4);
+        for (let s = 0; s < 10; s++) {
           const spike = new THREE.Mesh(spikeGeo, hairMat);
-          const sAng = (s / 8) * Math.PI * 2;
-          spike.position.set(Math.cos(sAng) * 0.23, 0.3, Math.sin(sAng) * 0.23);
+          const sAng = (s / 10) * Math.PI * 2;
+          spike.position.set(Math.cos(sAng) * 0.24, 0.32, Math.sin(sAng) * 0.24);
           spike.rotation.z = -Math.cos(sAng) * 0.42;
           spike.rotation.x = Math.sin(sAng) * 0.42;
           head.add(spike);
         }
       } else {
-        // Mahito's Messy Tendrils & Long Hair Tails
-        const tailGeo = new THREE.CylinderGeometry(0.08, 0.03, 0.75, 5);
+        const tailGeo = new THREE.CylinderGeometry(0.09, 0.04, 0.82, 6);
         const leftTail = new THREE.Mesh(tailGeo, hairMat);
         leftTail.position.set(-0.24, -0.05, -0.22);
         leftTail.rotation.set(-0.4, 0, -0.3);
@@ -1153,32 +1376,33 @@
         head.add(rightTail);
       }
 
-      // Eyes
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-      const leftEye = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 0.045), eyeMat);
+      const leftEye = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.05), new THREE.MeshBasicMaterial({ color: isYuji ? 0x111111 : 0x00f0ff }));
       leftEye.position.set(-0.14, 0.06, 0.285);
       head.add(leftEye);
 
-      const rightEye = leftEye.clone();
-      rightEye.position.x = 0.14;
+      const rightEye = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.05), new THREE.MeshBasicMaterial({ color: isYuji ? 0x111111 : 0x222a36 }));
+      rightEye.position.set(0.14, 0.06, 0.285);
       head.add(rightEye);
 
       if (isYuji) {
-        // Sukuna Eye Slits
         const scarMat = new THREE.MeshBasicMaterial({ color: 0x580f1d });
-        const leftScar = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.025), scarMat);
-        leftScar.position.set(-0.14, -0.04, 0.286);
+        const leftScar = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.025), scarMat);
+        leftScar.position.set(-0.14, -0.03, 0.286);
         head.add(leftScar);
         const rightScar = leftScar.clone();
         rightScar.position.x = 0.14;
         head.add(rightScar);
       } else {
-        // Mahito Facial Stitching
-        const stitchFaceMat = new THREE.MeshBasicMaterial({ color: 0x2c3545 });
-        const faceStitch = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.02), stitchFaceMat);
-        faceStitch.position.set(0.02, 0.01, 0.286);
-        faceStitch.rotation.z = 0.32;
-        head.add(faceStitch);
+        const stitchFaceMat = new THREE.MeshBasicMaterial({ color: 0x222a36 });
+        const faceStitchH = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.02), stitchFaceMat);
+        faceStitchH.position.set(0.02, 0.01, 0.286);
+        faceStitchH.rotation.z = 0.32;
+        head.add(faceStitchH);
+        for (let st = -2; st <= 2; st++) {
+          const cross = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.06), stitchFaceMat);
+          cross.position.set(0.02 + st * 0.06, 0.01 + st * 0.02, 0.287);
+          head.add(cross);
+        }
       }
 
       const shoulderGeo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
@@ -1201,19 +1425,18 @@
       leftElbow.position.y = -0.3;
       leftUpperArm.add(leftElbow);
 
-      const leftForearm = new THREE.Mesh(forearmGeo, isYuji ? skinMat : uniformMat);
+      const leftForearm = new THREE.Mesh(forearmGeo, isYuji ? wrapMat : skinMat);
       leftForearm.position.y = -0.3;
       leftForearm.castShadow = true;
       leftElbow.add(leftForearm);
 
       if (isYuji) {
-        // Cuff
-        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.3), uniformMat);
+        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.1, 0.33), new THREE.MeshStandardMaterial({ color: 0xba1818, roughness: 0.6 }));
         cuff.position.y = -0.15;
         leftForearm.add(cuff);
       }
 
-      const leftFist = new THREE.Mesh(fistGeo, skinMat);
+      const leftFist = new THREE.Mesh(fistGeo, isYuji ? wrapMat : skinMat);
       leftFist.position.y = -0.32;
       leftForearm.add(leftFist);
       torso.add(leftArmPivot);
@@ -1233,28 +1456,27 @@
       rightElbow.position.y = -0.3;
       rightUpperArm.add(rightElbow);
 
-      const rightForearm = new THREE.Mesh(forearmGeo, isYuji ? skinMat : uniformMat);
+      const rightForearm = new THREE.Mesh(forearmGeo, isYuji ? wrapMat : skinMat);
       rightForearm.position.y = -0.3;
       rightForearm.castShadow = true;
       rightElbow.add(rightForearm);
 
       if (isYuji) {
-        // Cuff
-        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.3), uniformMat);
+        const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.1, 0.33), new THREE.MeshStandardMaterial({ color: 0xba1818, roughness: 0.6 }));
         cuff.position.y = -0.15;
         rightForearm.add(cuff);
       }
 
-      const rightFist = new THREE.Mesh(fistGeo, skinMat);
+      const rightFist = new THREE.Mesh(fistGeo, isYuji ? wrapMat : skinMat);
       rightFist.position.y = -0.32;
       rightForearm.add(rightFist);
       torso.add(rightArmPivot);
 
-      // Legs with Cuffed Boots & Soles
       const thighGeo = new THREE.BoxGeometry(0.36, 0.7, 0.36);
       const calfGeo = new THREE.BoxGeometry(0.32, 0.65, 0.32);
       const bootGeo = new THREE.BoxGeometry(0.36, 0.28, 0.48);
       const soleGeo = new THREE.BoxGeometry(0.37, 0.06, 0.5);
+      const toeCapGeo = new THREE.BoxGeometry(0.37, 0.12, 0.14);
 
       // Left Leg
       const leftLegPivot = new THREE.Group();
@@ -1281,6 +1503,12 @@
       const leftSole = new THREE.Mesh(soleGeo, shoeSoleMat);
       leftSole.position.set(0, -0.16, 0);
       leftBoot.add(leftSole);
+
+      if (isYuji) {
+        const leftToeCap = new THREE.Mesh(toeCapGeo, shoeSoleMat);
+        leftToeCap.position.set(0, -0.09, 0.18);
+        leftBoot.add(leftToeCap);
+      }
       pelvis.add(leftLegPivot);
 
       // Right Leg
@@ -1308,6 +1536,12 @@
       const rightSole = new THREE.Mesh(soleGeo, shoeSoleMat);
       rightSole.position.set(0, -0.16, 0);
       rightBoot.add(rightSole);
+
+      if (isYuji) {
+        const rightToeCap = new THREE.Mesh(toeCapGeo, shoeSoleMat);
+        rightToeCap.position.set(0, -0.09, 0.18);
+        rightBoot.add(rightToeCap);
+      }
       pelvis.add(rightLegPivot);
 
       let auraMesh = null;
@@ -1436,7 +1670,7 @@
     scene.add(debrisGroup);
     const activeDebris = [];
     const debrisGeo = new THREE.DodecahedronGeometry(0.24, 0);
-    const debrisMat = new THREE.MeshStandardMaterial({ color: 0xd4b476, roughness: 0.85 }); // Sandstone/sand chunks
+    const debrisMat = new THREE.MeshStandardMaterial({ color: 0xd4b476, roughness: 0.85 });
 
     function spawnDebris(pos, intensity = 14) {
       for (let i = 0; i < intensity; i++) {
@@ -1457,6 +1691,34 @@
           vel: velocity,
           rot: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8),
           life: 1.6 + Math.random() * 0.6
+        });
+      }
+    }
+
+    const glassShards = [];
+    const shardGeo = new THREE.ConeGeometry(0.15, 0.35, 3);
+    const shardMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9 });
+
+    function spawnGlassBreak(pos) {
+      playBlockBreakSound();
+      for (let i = 0; i < 20; i++) {
+        const shard = new THREE.Mesh(shardGeo, shardMat.clone());
+        shard.position.copy(pos);
+        shard.position.y += (Math.random() - 0.5) * 0.8;
+        shard.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        scene.add(shard);
+
+        const vel = new THREE.Vector3(
+          (Math.random() - 0.5) * 12,
+          3 + Math.random() * 8,
+          (Math.random() - 0.5) * 12
+        );
+
+        glassShards.push({
+          mesh: shard,
+          vel: vel,
+          rot: new THREE.Vector3(Math.random() * 10, Math.random() * 10, Math.random() * 10),
+          life: 0.8
         });
       }
     }
@@ -1494,6 +1756,15 @@
     }
 
     const state = {
+      menuOpen: true,
+      multiplayer: {
+        active: false,
+        isHost: false,
+        peer: null,
+        conn: null,
+        roomCode: '',
+        lastBroadcast: 0
+      },
       player: {
         hp: 100,
         maxHp: 100,
@@ -1508,9 +1779,10 @@
         currentMove: null,
         actionTimer: 0,
         actionDuration: 0,
+        stunTimer: 0,
         m1Step: 0,
         lastM1Time: 0,
-        m1Lockout: 0, // 1.5s lockout after 4th M1 or downslam
+        m1Lockout: 0,
         pos: yuji.root.position,
         vel: new THREE.Vector3(),
         rotY: Math.PI,
@@ -1546,7 +1818,8 @@
         attackDuration: 0,
         attackPhase: 0,
         walkCycle: 0,
-        isHeadInGround: false
+        isHeadInGround: false,
+        isSuperLaunching: false
       },
       cooldowns: {
         skill1: 0,
@@ -1572,6 +1845,23 @@
       const hpNum = document.getElementById('player-hp-num');
       if (hpBar) hpBar.style.width = hpPct + '%';
       if (hpNum) hpNum.innerText = `${Math.round(state.player.hp)} / 100`;
+
+      const stunTag = document.getElementById('player-stun-tag');
+      const stateText = document.getElementById('player-state-text');
+      if (stunTag) {
+        if (state.player.state === 'STUNNED' || state.player.state === 'BLOCK_BROKEN') {
+          stunTag.classList.remove('hidden');
+          stunTag.innerText = state.player.state === 'BLOCK_BROKEN' ? 'GUARD BROKEN' : 'STUNNED';
+        } else {
+          stunTag.classList.add('hidden');
+        }
+      }
+      if (stateText) {
+        if (state.player.state === 'BLOCK_BROKEN') stateText.innerText = 'BROKEN';
+        else if (state.player.state === 'STUNNED') stateText.innerText = 'STUNNED';
+        else if (state.player.isBlocking) stateText.innerText = 'GUARDING';
+        else stateText.innerText = 'READY';
+      }
     }
 
     function updateEnemyUI() {
@@ -1591,8 +1881,13 @@
       }
 
       const stunTag = document.getElementById('enemy-stun-tag');
+      const guardBreakTag = document.getElementById('enemy-guardbreak-tag');
+      if (guardBreakTag) {
+        if (state.dummy.state === 'BLOCK_BROKEN') guardBreakTag.classList.remove('hidden');
+        else guardBreakTag.classList.add('hidden');
+      }
       if (stunTag) {
-        if (state.dummy.stunTimer > 0 && state.dummy.state !== 'RAGDOLL' && !state.dummy.isHeadInGround) {
+        if (state.dummy.stunTimer > 0 && state.dummy.state !== 'RAGDOLL' && !state.dummy.isHeadInGround && state.dummy.state !== 'BLOCK_BROKEN') {
           stunTag.classList.remove('hidden');
         } else {
           stunTag.classList.add('hidden');
@@ -1843,6 +2138,8 @@
       if (cinematicDrone) cinematicDrone.triggerAttack('D1');
       if (heartbeatSynth) heartbeatSynth.triggerAttackRelease('C1', '8n');
       triggerScreenShake(0.35);
+
+      broadcastMultiplayer({ type: 'AWAKEN_START' });
     }
 
     function completeCinematicAwakening() {
@@ -1924,28 +2221,26 @@
     function applyDamageToDummy(dmg, hitType, isUnblockable = false) {
       if (state.dummy.isDead) return false;
 
-      // KNOCKDOWN PROTECTION: Downed enemies laying flat on the floor cannot be hit!
       if (state.dummy.state === 'RAGDOLL' || state.dummy.isHeadInGround) {
         showHitBanner("OPPONENT IS DOWNED! (INVULNERABLE)");
         return false;
       }
 
-      // Behind check: Guard only protects frontal arc. Behind attacks break block!
       const victimFacing = new THREE.Vector3(Math.sin(state.dummy.rotY), 0, Math.cos(state.dummy.rotY)).normalize();
       const toAttacker = yuji.root.position.clone().sub(dummy.root.position).setY(0).normalize();
       const dot = victimFacing.dot(toAttacker);
-      const isFromBehind = dot < -0.2; // Attacker is behind victim
+      const isFromBehind = dot < -0.2;
 
       if (state.dummy.isBlocking && !isUnblockable) {
         if (isFromBehind) {
-          // Block Broken!
           state.dummy.isBlocking = false;
-          state.dummy.stunTimer = 0.9;
+          state.dummy.state = 'BLOCK_BROKEN';
+          state.dummy.stunTimer = 1.3;
+          spawnGlassBreak(dummy.root.position.clone().add(new THREE.Vector3(0, 1.4, 0)));
           triggerAnimeImpactFrame();
-          triggerScreenShake(0.35);
-          showHitBanner("GUARD BROKEN FROM BEHIND! CRITICAL HIT!");
+          triggerScreenShake(0.5);
+          showHitBanner("OPPONENT GUARD SHATTERED! CRITICAL HIT!");
         } else {
-          // Blocked: 0 DMG, 0 Ult gained, no stun!
           playPunchSound(false);
           triggerScreenShake(0.08);
           showHitBanner("BLOCKED! 0 DMG (0 ULT)");
@@ -1953,10 +2248,11 @@
         }
       }
 
-      // Unblocked or broken hit
       state.dummy.hp = Math.max(0, state.dummy.hp - dmg);
       updateEnemyUI();
-      state.dummy.stunTimer = 0.7; // 0.7s hitstun
+      if (state.dummy.state !== 'BLOCK_BROKEN') {
+        state.dummy.stunTimer = 0.7;
+      }
       state.dummy.isBlocking = false;
 
       const pushDir = dummy.root.position.clone().sub(yuji.root.position);
@@ -1968,16 +2264,30 @@
         state.dummy.ragdollTimer = 1.6;
         state.dummy.vel.copy(pushDir.multiplyScalar(44));
         state.dummy.vel.y = 11;
+      } else if (hitType === 'SUPER_MEGA_LAUNCH') {
+        state.dummy.isSuperLaunching = true;
+        state.dummy.state = 'LAUNCHED_BACK';
+        state.dummy.ragdollTimer = 4.0;
+        state.dummy.vel.copy(pushDir.multiplyScalar(240));
+        state.dummy.vel.y = 52;
+      } else if (hitType === 'BLACK_FLASH_STAGGER') {
+        state.dummy.state = 'IDLE';
+        state.dummy.stunTimer = 1.2;
+        state.dummy.vel.copy(pushDir.multiplyScalar(10));
+        state.dummy.vel.y = 1.2;
       } else if (hitType === 'BLACK_FLASH_LAUNCH') {
         state.dummy.state = 'RAGDOLL';
         state.dummy.ragdollTimer = 1.1;
-        state.dummy.vel.copy(pushDir.multiplyScalar(15));
+        state.dummy.vel.copy(pushDir.multiplyScalar(18));
         state.dummy.vel.y = 3.2;
       } else if (hitType === 'DOWN_SLAM') {
         state.dummy.state = 'RAGDOLL';
-        state.dummy.ragdollTimer = 1.5; // Lays down for 1.5s (INVULNERABLE)
-        state.dummy.vel.set(0, 0, 0);   // Stop movement immediately
-        dummy.root.position.y = 0;      // Snap directly to the floor instantly
+        state.dummy.ragdollTimer = 1.5;
+        state.dummy.stunTimer = 0;
+        state.dummy.attackTimer = 0;
+        state.dummy.vel.set(0, 0, 0);
+        const dummyTerrainY = getTerrainHeight(dummy.root.position.x, dummy.root.position.z);
+        dummy.root.position.y = dummyTerrainY;
         dummy.pelvis.position.y = 0.22;
         dummy.pelvis.rotation.set(-Math.PI / 2, 0, 0);
       } else if (hitType === 'DROPKICK_LAUNCH') {
@@ -1990,29 +2300,43 @@
       }
 
       if (state.dummy.hp <= 0) {
-        triggerDummyDeath(hitType === 'BLACK_FLASH_LAUNCH' || hitType === 'FAR_LAUNCH');
+        triggerDummyDeath(hitType === 'BLACK_FLASH_LAUNCH' || hitType === 'BLACK_FLASH_STAGGER' || hitType === 'FAR_LAUNCH', hitType === 'SUPER_MEGA_LAUNCH');
       }
+
+      broadcastMultiplayer({
+        type: 'DAMAGE_APPLIED',
+        dmg: dmg,
+        hitType: hitType,
+        isUnblockable: isUnblockable,
+        targetHp: state.dummy.hp
+      });
 
       return true;
     }
 
-    function triggerDummyDeath(explodeWithBlackFlash = false) {
+    function triggerDummyDeath(explodeWithBlackFlash = false, preserveVelocity = false) {
       if (state.dummy.isDead) return;
       state.dummy.isDead = true;
-      state.dummy.respawnTimer = 2.0;
-      state.dummy.state = 'DEAD';
-      state.dummy.vel.set(0, 0, 0);
+      state.dummy.respawnTimer = preserveVelocity ? 4.0 : 2.0;
+
+      if (!preserveVelocity) {
+        state.dummy.state = 'DEAD';
+        state.dummy.vel.set(0, 0, 0);
+      }
 
       if (explodeWithBlackFlash) {
         spawnBlackFlashLightning(dummy.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 2.5);
         spawnDebris(dummy.root.position, 24);
         triggerScreenShake(1.2);
         showHitBanner("KOKUSEN DEFEAT COLLAPSE!!");
+      } else if (preserveVelocity) {
+        showHitBanner("HORIZON BLASTOFF DEFEAT!!");
       } else {
-        showHitBanner("MAHITO COLLAPSED (RESPAWNING IN 2s)");
+        showHitBanner("OPPONENT COLLAPSED (RESPAWNING IN 2s)");
       }
     }
 
+    // Fixed: Guaranteed immediate OST and Zone termination upon player defeat
     function triggerPlayerDeath() {
       if (state.player.isDead) return;
       state.player.isDead = true;
@@ -2020,8 +2344,17 @@
       state.player.respawnTimer = 2.0;
       state.player.state = 'DEAD';
       state.player.vel.set(0, 0, 0);
+
+      // Cleanly stop Ultimate OST & Zone immediately on death
+      if (state.player.inZone) {
+        deactivateTheZone();
+      }
+      stopAwakeningOST();
+
       updatePlayerUI();
       showHitBanner("YOU COLLAPSED (RESPAWNING IN 2s)");
+
+      broadcastMultiplayer({ type: 'PLAYER_DEATH' });
     }
 
     function respawnPlayer() {
@@ -2029,9 +2362,12 @@
       state.player.isDead = false;
       state.player.respawnTimer = 0;
       state.player.state = 'IDLE';
+      state.player.stunTimer = 0;
       state.player.vel.set(0, 0, 0);
       yuji.root.position.set(0, 0, 8);
       yuji.torso.rotation.set(0, 0, 0);
+      yuji.pelvis.position.y = 1.6;
+      yuji.pelvis.rotation.set(0, 0, 0);
       updatePlayerUI();
       showHitBanner("YUJI RESPAWNED");
     }
@@ -2040,6 +2376,7 @@
       state.dummy.hp = 100;
       state.dummy.isDead = false;
       state.dummy.isHeadInGround = false;
+      state.dummy.isSuperLaunching = false;
       state.dummy.respawnTimer = 0;
       state.dummy.state = 'IDLE';
       state.dummy.stunTimer = 0;
@@ -2050,10 +2387,15 @@
       dummy.pelvis.rotation.set(0, 0, 0);
       dummy.torso.rotation.set(0, 0, 0);
       updateEnemyUI();
-      showHitBanner("MAHITO RESPAWNED");
+      showHitBanner(state.multiplayer.active ? "RIVAL RESPAWNED" : "MAHITO RESPAWNED");
     }
 
     function updateDummyAI(dt) {
+      if (state.multiplayer.active) {
+        // Handled via WebRTC network updates
+        return;
+      }
+
       if (state.dummy.isDead) {
         state.dummy.respawnTimer -= dt;
         if (state.dummy.respawnTimer <= 0) {
@@ -2062,16 +2404,21 @@
         return;
       }
 
-      if (state.dummy.stunTimer > 0) {
+      if (state.dummy.state === 'BLOCK_BROKEN') {
         state.dummy.stunTimer -= dt;
+        if (state.dummy.stunTimer <= 0) {
+          state.dummy.state = 'IDLE';
+          updateEnemyUI();
+        }
         return;
       }
+
       if (state.dummy.state === 'RAGDOLL' || state.dummy.state === 'LAUNCHED_BACK') {
         state.dummy.ragdollTimer -= dt;
-        // Fix: Removed the restrictive 'y <= 0.05' check so fighters get up anywhere on sand hills/dunes
         if (state.dummy.ragdollTimer <= 0) {
           state.dummy.state = 'IDLE';
           state.dummy.isHeadInGround = false;
+          state.dummy.isSuperLaunching = false;
           dummy.pelvis.position.y = 1.6;
           dummy.pelvis.rotation.set(0, 0, 0);
           dummy.torso.rotation.set(0, 0, 0);
@@ -2086,6 +2433,11 @@
           dummy.leftKnee.rotation.set(0, 0, 0);
           dummy.rightKnee.rotation.set(0, 0, 0);
         }
+        return;
+      }
+
+      if (state.dummy.stunTimer > 0) {
+        state.dummy.stunTimer -= dt;
         return;
       }
 
@@ -2131,19 +2483,36 @@
           setTimeout(() => {
             const currentDist = yuji.root.position.distanceTo(dummy.root.position);
             if (currentDist < 4.2 && state.player.state !== 'CINEMATIC' && !state.player.isDead) {
+              const playerFacing = new THREE.Vector3(Math.sin(state.player.rotY), 0, Math.cos(state.player.rotY)).normalize();
+              const toMahito = dummy.root.position.clone().sub(yuji.root.position).setY(0).normalize();
+              const isBehindPlayer = playerFacing.dot(toMahito) < -0.2;
+
               if (state.player.isBlocking) {
-                playPunchSound(false);
-                triggerScreenShake(0.12);
-                showHitBanner("PLAYER BLOCKED ATTACK!");
-                addAwakeningGauge(3);
+                if (isBehindPlayer) {
+                  state.player.isBlocking = false;
+                  state.player.state = 'BLOCK_BROKEN';
+                  state.player.stunTimer = 1.3;
+                  spawnGlassBreak(yuji.root.position.clone().add(new THREE.Vector3(0, 1.4, 0)));
+                  triggerAnimeImpactFrame();
+                  triggerScreenShake(0.5);
+                  showHitBanner("YOUR GUARD WAS BROKEN FROM BEHIND!");
+                  updatePlayerUI();
+                } else {
+                  playPunchSound(false);
+                  triggerScreenShake(0.12);
+                  showHitBanner("PLAYER BLOCKED ATTACK!");
+                  addAwakeningGauge(3);
+                }
               } else {
                 playPunchSound(true);
                 state.player.hp = Math.max(0, state.player.hp - 12);
+                state.player.state = 'STUNNED';
+                state.player.stunTimer = 0.7;
                 updatePlayerUI();
                 triggerScreenShake(0.35);
                 spawnDebris(yuji.root.position, 6);
                 addAwakeningGauge(6);
-                showHitBanner("MAHITO SOUL STRIKE!");
+                showHitBanner("MAHITO HIT! YOU ARE STUNNED (0.7s)!");
                 if (state.player.hp <= 0) triggerPlayerDeath();
               }
             }
@@ -2153,6 +2522,7 @@
     }
 
     function executeJump() {
+      if (state.menuOpen) return;
       if (state.player.state !== 'IDLE' && state.player.state !== 'ATTACKING') return;
       if (state.player.isAirborne || state.cinematic.active || state.player.isDead) return;
 
@@ -2168,10 +2538,16 @@
         state.player.hasDownslamReady = true;
         showHitBanner("DOWNSLAM PRIMED IN AIR!");
       }
+
+      broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'JUMP' });
     }
 
     function executeM1() {
-      if (state.player.isDead || state.player.isBlocking || state.cinematic.active) return;
+      if (state.menuOpen || state.player.isDead || state.player.isBlocking || state.cinematic.active) return;
+      if (state.player.state === 'STUNNED' || state.player.state === 'BLOCK_BROKEN') {
+        showHitBanner("CANNOT ATTACK WHILE STUNNED!");
+        return;
+      }
       if (state.player.m1Lockout > 0) {
         showHitBanner(`M1 RECOVERING: ${state.player.m1Lockout.toFixed(1)}s`);
         return;
@@ -2186,7 +2562,6 @@
         state.player.m1Step = 0;
       }
 
-      // Check for Aerial Jump Downslam
       if (state.player.isAirborne && state.player.hasDownslamReady) {
         state.player.hasDownslamReady = false;
         state.player.m1Step = 0;
@@ -2206,21 +2581,22 @@
           triggerScreenShake(0.7);
           spawnDebris(dummy.root.position, 18);
           playPunchSound(true);
-          const cleanHit = applyDamageToDummy(14, 'DOWN_SLAM', false);
+          const cleanHit = applyDamageToDummy(14, 'DOWN_SLAM', true);
           if (cleanHit) addAwakeningGauge(8);
           showHitBanner("AERIAL DOWNSLAM FINISHER!!");
         }
+        broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'DOWNSLAM' });
         return;
       }
 
       state.player.m1Step = (state.player.m1Step % 4) + 1;
       state.player.lastM1Time = now;
-      state.cooldowns.m1Delay = 0.5; // Strict 0.5s cadence delay between each M1
+      state.cooldowns.m1Delay = 0.5;
       updateM1Dots(state.player.m1Step);
 
       const isHeavy = (state.player.m1Step === 4);
       if (isHeavy) {
-        state.player.m1Lockout = 1.5; // 1.5s combo lockout after 4th M1
+        state.player.m1Lockout = 1.5;
       }
 
       state.player.state = 'ATTACKING';
@@ -2243,7 +2619,6 @@
 
       const dist = yuji.root.position.distanceTo(dummy.root.position);
       if (dist < 4.5) {
-        // Prevent hitting downed enemies laying on the ground
         if (state.dummy.state === 'RAGDOLL' || state.dummy.isHeadInGround) {
           showHitBanner("CANNOT M1 DOWNED ENEMY!");
           return;
@@ -2256,11 +2631,12 @@
         if (cleanHit) addAwakeningGauge(isHeavy ? 6 : 3);
         showHitBanner(isHeavy ? "4TH HIT KNOCKBACK! (1.5s RECOVERY)" : `PUNCH ${state.player.m1Step}`);
       }
+
+      broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'M1', step: state.player.m1Step });
     }
 
-    // Move 1: Divergent Fist (6s CD / 7 DMG) / Ult: Soul Dismantle (8s CD / 15 DMG)
     function triggerMove1() {
-      if (state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
+      if (state.menuOpen || state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
       if (state.cooldowns.skill1 > 0) return;
 
       state.player.state = 'ATTACKING';
@@ -2330,11 +2706,12 @@
           }
         }
       }
+
+      broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'SKILL_1' });
     }
 
-    // Move 2: Manji Kick (7s CD / 9 DMG) / Ult: Piercing Blood (8s CD / 15 DMG)
     function triggerMove2() {
-      if (state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
+      if (state.menuOpen || state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
       if (state.cooldowns.skill2 > 0) return;
 
       state.player.state = 'ATTACKING';
@@ -2389,11 +2766,12 @@
           showHitBanner(isFinisherTarget ? "MANJI KICK AERIAL FINISHER!!" : "MANJI KICK (9 DMG)!");
         }
       }
+
+      broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'SKILL_2' });
     }
 
-    // Move 3: Cursed Dropkick (11s CD / 15 DMG) / Ult: Cleave Rush (8s CD / 15 DMG)
     function triggerMove3() {
-      if (state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
+      if (state.menuOpen || state.player.isDead || state.player.state !== 'IDLE' || state.cinematic.active) return;
       if (state.cooldowns.skill3 > 0) return;
 
       state.player.state = 'ATTACKING';
@@ -2431,18 +2809,19 @@
         if (d < 5.8) {
           const isFinisherTarget = (state.dummy.hp < 15);
           triggerAnimeImpactFrame();
-          triggerScreenShake(0.65);
-          spawnDebris(dummy.root.position, 18);
-          applyDamageToDummy(15, isFinisherTarget ? 'FAR_LAUNCH' : 'DROPKICK_LAUNCH', true);
+          triggerScreenShake(0.85);
+          spawnDebris(dummy.root.position, 20);
+          applyDamageToDummy(15, isFinisherTarget ? 'SUPER_MEGA_LAUNCH' : 'DROPKICK_LAUNCH', true);
           addAwakeningGauge(12);
-          showHitBanner(isFinisherTarget ? "CURSED DROPKICK SUPER-FINISHER!!" : "CURSED DROPKICK (15 DMG)!");
+          showHitBanner(isFinisherTarget ? "HORIZON BLAST-OFF DROPKICK FINISHER!!" : "CURSED DROPKICK (15 DMG)!");
         }
       }
+
+      broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'SKILL_3' });
     }
 
-    // Move 4: Black Flash (10 DMG, strict 1s chain) / Ult: 8x Barrage (35s CD / 4 DMG x 8)
     function triggerMove4() {
-      if (state.player.isDead || state.cinematic.active) return;
+      if (state.menuOpen || state.player.isDead || state.cinematic.active) return;
 
       const isChaining = (state.player.chainWindowTimer > 0);
       if (!isChaining && state.player.state !== 'IDLE') return;
@@ -2507,7 +2886,8 @@
           spawnBlackFlashLightning(hitPos, 1.2 + streak * 0.22);
           spawnDebris(dummy.root.position, 18);
 
-          const cleanHit = applyDamageToDummy(10, 'BLACK_FLASH_LAUNCH', false);
+          const hitType = isFinisherTarget ? 'BLACK_FLASH_LAUNCH' : 'BLACK_FLASH_STAGGER';
+          const cleanHit = applyDamageToDummy(10, hitType, false);
 
           if (cleanHit) {
             addAwakeningGauge(16);
@@ -2518,6 +2898,7 @@
             }
 
             state.player.chainWindowTimer = 1.0;
+            state.cooldowns.skill4 = 0.5;
             showChainIndicator(true, 1.0);
             showHitBanner(`KOKUSEN #${streak}! (1.0s CHAIN ACTIVE)`);
           } else {
@@ -2530,10 +2911,12 @@
           state.cooldowns.skill4 = 5.0;
         }
       }
+
+      broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'SKILL_4' });
     }
 
     function executeDash() {
-      if (state.player.isDead || state.cinematic.active) return;
+      if (state.menuOpen || state.player.isDead || state.cinematic.active) return;
       if (state.player.state !== 'IDLE' && state.player.state !== 'DASHING') return;
       if (state.cooldowns.dash > 0) return;
 
@@ -2561,6 +2944,8 @@
       state.player.vel.y = 8.5;
       playDodgeSound();
       triggerScreenShake(0.24);
+
+      broadcastMultiplayer({ type: 'MOVE_ACTION', move: 'DASH' });
     }
 
     function getMovementInputVector() {
@@ -2588,6 +2973,8 @@
       initAudio();
       keys[e.code] = true;
 
+      if (state.menuOpen) return;
+
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyZ') {
         toggleShiftLock();
       }
@@ -2605,8 +2992,7 @@
       if (e.code === 'KeyQ') executeDash();
       if (e.code === 'KeyF') {
         state.player.isBlocking = true;
-        const tag = document.getElementById('player-state-text');
-        if (tag) tag.innerText = 'GUARDING';
+        updatePlayerUI();
       }
       if (e.code === 'KeyG') {
         tryActivateTheZone();
@@ -2618,8 +3004,7 @@
       keys[e.code] = false;
       if (e.code === 'KeyF') {
         state.player.isBlocking = false;
-        const tag = document.getElementById('player-state-text');
-        if (tag) tag.innerText = 'READY';
+        updatePlayerUI();
       }
     });
 
@@ -2628,11 +3013,12 @@
 
     window.addEventListener('touchstart', (e) => {
       initAudio();
+      if (state.menuOpen) return;
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         const el = document.elementFromPoint(touch.clientX, touch.clientY);
         
-        if (el && (el.closest('button') || el.closest('#mobile-controls'))) {
+        if (el && (el.closest('button') || el.closest('#mobile-controls') || el.closest('#mobile-dash-btn') || el.closest('#mobile-jump-btn') || el.closest('#mobile-guard-btn') || el.closest('#mobile-m1-btn'))) {
           continue;
         }
 
@@ -2645,7 +3031,7 @@
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
-      if (lookTouchId === null) return;
+      if (lookTouchId === null || state.menuOpen) return;
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === lookTouchId) {
@@ -2677,7 +3063,8 @@
 
     window.addEventListener('mousedown', (e) => {
       initAudio();
-      if (e.target.closest('button') || e.target.closest('#mobile-controls')) return;
+      if (state.menuOpen) return;
+      if (e.target.closest('button') || e.target.closest('#mobile-controls') || e.target.closest('#mobile-dash-btn') || e.target.closest('#mobile-jump-btn') || e.target.closest('#mobile-guard-btn') || e.target.closest('#mobile-m1-btn')) return;
 
       lastMousePos = { x: e.clientX, y: e.clientY };
       mouseStartPos = { x: e.clientX, y: e.clientY };
@@ -2691,6 +3078,7 @@
     });
 
     window.addEventListener('mouseup', (e) => {
+      if (state.menuOpen) return;
       if (e.button === 0) {
         const distMoved = Math.hypot(e.clientX - mouseStartPos.x, e.clientY - mouseStartPos.y);
         if (!isLeftDragging && distMoved < 6 && !state.cinematic.active && !state.player.isDead) {
@@ -2707,6 +3095,7 @@
     });
 
     window.addEventListener('mousemove', (e) => {
+      if (state.menuOpen) return;
       const movementX = (document.pointerLockElement) ? e.movementX : (e.clientX - lastMousePos.x);
       const movementY = (document.pointerLockElement) ? e.movementY : (e.clientY - lastMousePos.y);
 
@@ -2717,7 +3106,10 @@
         }
       }
 
-      if (state.shiftLock || isRightMouseDown || (isMouseDown && isLeftDragging)) {
+      if (document.pointerLockElement) {
+        state.camera.yaw -= e.movementX * 0.005;
+        state.camera.pitch = Math.max(-0.25, Math.min(1.25, state.camera.pitch + e.movementY * 0.005));
+      } else if (isRightMouseDown || (isMouseDown && isLeftDragging)) {
         state.camera.yaw -= movementX * 0.005;
         state.camera.pitch = Math.max(-0.25, Math.min(1.25, state.camera.pitch + movementY * 0.005));
       }
@@ -2725,9 +3117,8 @@
       lastMousePos = { x: e.clientX, y: e.clientY };
     });
 
-    // PC Mouse Wheel Camera Zoom
     window.addEventListener('wheel', (e) => {
-      if (state.cinematic.active) return;
+      if (state.cinematic.active || state.menuOpen) return;
       state.camera.dist = Math.max(3.5, Math.min(22.0, state.camera.dist + e.deltaY * 0.012));
     }, { passive: true });
 
@@ -2747,13 +3138,17 @@
     document.getElementById('btn-jump').addEventListener('click', () => { if (!state.cinematic.active && !state.player.isDead) { initAudio(); executeJump(); } });
     document.getElementById('btn-shiftlock').addEventListener('click', toggleShiftLock);
 
-    document.getElementById('btn-block').addEventListener('mousedown', () => { if (!state.cinematic.active && !state.player.isDead) state.player.isBlocking = true; });
-    document.getElementById('btn-block').addEventListener('mouseup', () => { state.player.isBlocking = false; });
-    document.getElementById('btn-block').addEventListener('touchstart', (e) => { e.preventDefault(); if (!state.cinematic.active && !state.player.isDead) state.player.isBlocking = true; });
-    document.getElementById('btn-block').addEventListener('touchend', (e) => { e.preventDefault(); state.player.isBlocking = false; });
+    document.getElementById('btn-block').addEventListener('mousedown', () => { if (!state.cinematic.active && !state.player.isDead) { state.player.isBlocking = true; updatePlayerUI(); } });
+    document.getElementById('btn-block').addEventListener('mouseup', () => { state.player.isBlocking = false; updatePlayerUI(); });
+    document.getElementById('btn-block').addEventListener('touchstart', (e) => { e.preventDefault(); if (!state.cinematic.active && !state.player.isDead) { state.player.isBlocking = true; updatePlayerUI(); } });
+    document.getElementById('btn-block').addEventListener('touchend', (e) => { e.preventDefault(); state.player.isBlocking = false; updatePlayerUI(); });
     document.getElementById('btn-awaken').addEventListener('click', () => { initAudio(); tryActivateTheZone(); });
 
     document.getElementById('btn-dummy-mode').addEventListener('click', () => {
+      if (state.multiplayer.active) {
+        showHitBanner("AI MODE DISABLED IN MULTIPLAYER");
+        return;
+      }
       const modes = ['SANDBAG', 'DEFENSIVE', 'AGGRESSIVE'];
       const next = modes[(modes.indexOf(state.dummy.mode) + 1) % modes.length];
       state.dummy.mode = next;
@@ -2773,6 +3168,71 @@
 
     document.getElementById('btn-reset-dummy').addEventListener('click', respawnDummy);
 
+    // Dedicated Mobile Dash Button
+    const mobileDashBtn = document.getElementById('mobile-dash-btn');
+    if (mobileDashBtn) {
+      mobileDashBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.cinematic.active || state.player.isDead) return;
+        initAudio();
+        executeDash();
+      }, { passive: false });
+    }
+
+    // Dedicated Mobile Jump Button
+    const mobileJumpBtn = document.getElementById('mobile-jump-btn');
+    if (mobileJumpBtn) {
+      mobileJumpBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        initAudio();
+        executeJump();
+      }, { passive: false });
+    }
+
+    // Dedicated Mobile Guard Button
+    const mobileGuardBtn = document.getElementById('mobile-guard-btn');
+    if (mobileGuardBtn) {
+      mobileGuardBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.cinematic.active || state.player.isDead) return;
+        initAudio();
+        state.player.isBlocking = true;
+        updatePlayerUI();
+      }, { passive: false });
+
+      mobileGuardBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        state.player.isBlocking = false;
+        updatePlayerUI();
+      }, { passive: false });
+
+      mobileGuardBtn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        state.player.isBlocking = false;
+        updatePlayerUI();
+      });
+    }
+
+    // Dedicated Mobile M1 Attack Button
+    const mobileM1Btn = document.getElementById('mobile-m1-btn');
+    if (mobileM1Btn) {
+      mobileM1Btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.cinematic.active || state.player.isDead) return;
+        initAudio();
+        if (state.player.chainWindowTimer > 0 && state.cooldowns.skill4 <= 0) {
+          triggerMove4();
+        } else {
+          executeM1();
+        }
+      }, { passive: false });
+    }
+
     let soundEnabled = true;
     document.getElementById('btn-sound').addEventListener('click', () => {
       initAudio();
@@ -2784,7 +3244,205 @@
       if (icon) icon.innerText = soundEnabled ? '🔊' : '🔇';
     });
 
-    // Touch Virtual Joystick
+    const menuOverlay = document.getElementById('main-menu-overlay');
+    const menuPrimary = document.getElementById('menu-primary-actions');
+    const menuHostBox = document.getElementById('menu-host-box');
+    const menuJoinBox = document.getElementById('menu-join-box');
+
+    function openGameArena(isMultiplayer = false) {
+      state.menuOpen = false;
+      if (menuOverlay) {
+        menuOverlay.style.opacity = '0';
+        setTimeout(() => {
+          menuOverlay.style.display = 'none';
+        }, 300);
+      }
+      initAudio();
+      const enemyLabel = document.getElementById('enemy-name-label');
+      if (enemyLabel) {
+        enemyLabel.innerText = isMultiplayer ? 'RIVAL (PLAYER 2)' : 'MAHITO (AI)';
+      }
+      const dummyBtn = document.getElementById('btn-dummy-mode');
+      if (dummyBtn) {
+        dummyBtn.style.display = isMultiplayer ? 'none' : 'flex';
+      }
+    }
+
+    function returnToMenu() {
+      state.menuOpen = true;
+      if (menuOverlay) {
+        menuOverlay.style.display = 'flex';
+        setTimeout(() => {
+          menuOverlay.style.opacity = '1';
+        }, 10);
+      }
+      if (menuPrimary) menuPrimary.classList.remove('hidden');
+      if (menuHostBox) menuHostBox.classList.add('hidden');
+      if (menuJoinBox) menuJoinBox.classList.add('hidden');
+
+      if (state.multiplayer.conn) {
+        state.multiplayer.conn.close();
+      }
+      state.multiplayer.active = false;
+      showHitBanner("RETURNED TO LOBBY");
+    }
+
+    document.getElementById('btn-menu-return').addEventListener('click', returnToMenu);
+
+    document.getElementById('btn-menu-solo').addEventListener('click', () => {
+      state.multiplayer.active = false;
+      openGameArena(false);
+      showHitBanner("SOLO PRACTICE STARTED");
+    });
+
+    document.getElementById('btn-menu-create').addEventListener('click', () => {
+      if (menuPrimary) menuPrimary.classList.add('hidden');
+      if (menuHostBox) menuHostBox.classList.remove('hidden');
+
+      const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+      state.multiplayer.roomCode = randomCode;
+      state.multiplayer.isHost = true;
+
+      const codeDisplay = document.getElementById('room-code-display');
+      if (codeDisplay) codeDisplay.innerText = randomCode;
+
+      try {
+        const peerId = 'jjs-room-' + randomCode;
+        if (state.multiplayer.peer) state.multiplayer.peer.destroy();
+        state.multiplayer.peer = new Peer(peerId);
+
+        state.multiplayer.peer.on('connection', (conn) => {
+          state.multiplayer.conn = conn;
+          state.multiplayer.active = true;
+          setupMultiplayerDataHandlers(conn);
+          openGameArena(true);
+          showHitBanner("RIVAL CONNECTED! BATTLE START!");
+        });
+
+        state.multiplayer.peer.on('error', (err) => {
+          console.warn("PeerJS host notice:", err);
+        });
+      } catch (err) {
+        console.warn("PeerJS setup error:", err);
+      }
+    });
+
+    document.getElementById('btn-copy-code').addEventListener('click', () => {
+      const code = state.multiplayer.roomCode;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).catch(() => {});
+      }
+      const btn = document.getElementById('btn-copy-code');
+      if (btn) {
+        btn.innerText = 'COPIED!';
+        setTimeout(() => { btn.innerText = 'COPY'; }, 1500);
+      }
+    });
+
+    document.getElementById('btn-host-cancel').addEventListener('click', () => {
+      if (state.multiplayer.peer) state.multiplayer.peer.destroy();
+      if (menuHostBox) menuHostBox.classList.add('hidden');
+      if (menuPrimary) menuPrimary.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-menu-join-toggle').addEventListener('click', () => {
+      if (menuPrimary) menuPrimary.classList.add('hidden');
+      if (menuJoinBox) menuJoinBox.classList.remove('hidden');
+      const input = document.getElementById('input-room-code');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+    });
+
+    document.getElementById('btn-join-cancel').addEventListener('click', () => {
+      if (menuJoinBox) menuJoinBox.classList.add('hidden');
+      if (menuPrimary) menuPrimary.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-join-submit').addEventListener('click', () => {
+      const input = document.getElementById('input-room-code');
+      const code = input ? input.value.trim() : '';
+      const statusText = document.getElementById('join-status-text');
+
+      if (!code || code.length < 4) {
+        if (statusText) statusText.innerText = "Please enter a valid 4-digit code!";
+        return;
+      }
+
+      if (statusText) statusText.innerText = "Connecting to room " + code + "...";
+
+      try {
+        if (state.multiplayer.peer) state.multiplayer.peer.destroy();
+        state.multiplayer.peer = new Peer();
+
+        state.multiplayer.peer.on('open', () => {
+          const targetId = 'jjs-room-' + code;
+          const conn = state.multiplayer.peer.connect(targetId);
+
+          conn.on('open', () => {
+            state.multiplayer.conn = conn;
+            state.multiplayer.active = true;
+            state.multiplayer.isHost = false;
+            setupMultiplayerDataHandlers(conn);
+            openGameArena(true);
+            showHitBanner("CONNECTED TO HOST! FIGHT!");
+          });
+
+          conn.on('error', (e) => {
+            if (statusText) statusText.innerText = "Failed to connect! Check room code.";
+          });
+        });
+
+        state.multiplayer.peer.on('error', (err) => {
+          if (statusText) statusText.innerText = "Connection error: Check code or host status.";
+        });
+      } catch (err) {
+        if (statusText) statusText.innerText = "WebRTC peer connection error.";
+      }
+    });
+
+    function setupMultiplayerDataHandlers(conn) {
+      conn.on('data', (data) => {
+        if (!data) return;
+
+        if (data.type === 'SYNC') {
+          dummy.root.position.set(data.x, data.y, data.z);
+          dummy.root.rotation.y = data.rotY;
+          state.dummy.hp = data.hp;
+          state.dummy.isBlocking = data.isBlocking;
+          state.dummy.state = data.state;
+          updateEnemyUI();
+        } else if (data.type === 'DAMAGE_APPLIED') {
+          state.player.hp = Math.max(0, state.player.hp - data.dmg);
+          updatePlayerUI();
+          triggerScreenShake(0.4);
+          if (state.player.hp <= 0) triggerPlayerDeath();
+        } else if (data.type === 'PLAYER_DEATH') {
+          state.dummy.hp = 0;
+          state.dummy.isDead = true;
+          updateEnemyUI();
+          showHitBanner("RIVAL DEFEATED!");
+        } else if (data.type === 'MOVE_ACTION') {
+          if (data.move === 'M1') playPunchSound(data.step === 4);
+          if (data.move === 'DASH') playDodgeSound();
+        }
+      });
+
+      conn.on('close', () => {
+        state.multiplayer.active = false;
+        showHitBanner("RIVAL DISCONNECTED");
+      });
+    }
+
+    function broadcastMultiplayer(payload) {
+      if (!state.multiplayer.active || !state.multiplayer.conn) return;
+      try {
+        state.multiplayer.conn.send(payload);
+      } catch (e) {}
+    }
+
+    // Touch Virtual Joystick Logic
     const joystick = document.getElementById('mobile-controls');
     const knob = document.getElementById('joystick-knob');
     let joystickTouchId = null;
@@ -2850,7 +3508,7 @@
       const dt = Math.min(rawDt, 0.05);
       const time = clock.getElapsedTime();
 
-      // Dynamic Animated Ocean Waves
+      // Dynamic ocean wave simulation
       const posAttr = waterGeo.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
         const u = posAttr.getX(i);
@@ -2893,6 +3551,16 @@
       }
       if (state.cooldowns.m1Delay > 0) {
         state.cooldowns.m1Delay -= dt;
+      }
+
+      if (state.player.stunTimer > 0) {
+        state.player.stunTimer -= dt;
+        if (state.player.stunTimer <= 0) {
+          if (state.player.state === 'STUNNED' || state.player.state === 'BLOCK_BROKEN') {
+            state.player.state = 'IDLE';
+            updatePlayerUI();
+          }
+        }
       }
 
       // 6-Second Awakening Cinematic Cutscene
@@ -3033,7 +3701,7 @@
 
       if (state.player.actionTimer > 0) {
         state.player.actionTimer -= dt;
-        if (state.player.actionTimer <= 0 && state.player.state !== 'IDLE') {
+        if (state.player.actionTimer <= 0 && state.player.state !== 'IDLE' && state.player.state !== 'STUNNED' && state.player.state !== 'BLOCK_BROKEN') {
           state.player.state = 'IDLE';
           state.player.currentMove = null;
         }
@@ -3085,7 +3753,6 @@
         }
       }
 
-      // Island Boundary Clamping (Soft beach perimeter)
       const beachLimit = islandRadius - 2.5;
       const pDist = Math.hypot(yuji.root.position.x, yuji.root.position.z);
       if (pDist > beachLimit) {
@@ -3095,20 +3762,40 @@
       }
       yuji.root.rotation.y = state.player.rotY;
 
-      state.dummy.vel.x *= 0.88;
-      state.dummy.vel.z *= 0.88;
-      state.dummy.vel.y -= 25 * dt;
+      // Broadcast position to peer in multiplayer
+      if (state.multiplayer.active && time - state.multiplayer.lastBroadcast > 0.033) {
+        state.multiplayer.lastBroadcast = time;
+        broadcastMultiplayer({
+          type: 'SYNC',
+          x: yuji.root.position.x,
+          y: yuji.root.position.y,
+          z: yuji.root.position.z,
+          rotY: state.player.rotY,
+          hp: state.player.hp,
+          isBlocking: state.player.isBlocking,
+          state: state.player.state
+        });
+      }
+
+      if (state.dummy.isSuperLaunching) {
+        state.dummy.vel.x *= 0.995;
+        state.dummy.vel.z *= 0.995;
+        state.dummy.vel.y -= 12 * dt;
+      } else {
+        state.dummy.vel.x *= 0.88;
+        state.dummy.vel.z *= 0.88;
+        state.dummy.vel.y -= 25 * dt;
+      }
       dummy.root.position.addScaledVector(state.dummy.vel, dt);
 
       const dummyTerrainY = getTerrainHeight(dummy.root.position.x, dummy.root.position.z);
-      if (dummy.root.position.y <= dummyTerrainY) {
+      if (dummy.root.position.y <= dummyTerrainY && !state.dummy.isSuperLaunching) {
         dummy.root.position.y = dummyTerrainY;
         state.dummy.vel.y = 0;
       }
 
-      // Shoreline boundary bounce for dummy
       const dDist = Math.hypot(dummy.root.position.x, dummy.root.position.z);
-      if (dDist > beachLimit) {
+      if (dDist > beachLimit && !state.dummy.isSuperLaunching && state.dummy.state !== 'LAUNCHED_BACK') {
         const dAngle = Math.atan2(dummy.root.position.z, dummy.root.position.x);
         dummy.root.position.x = Math.cos(dAngle) * beachLimit;
         dummy.root.position.z = Math.sin(dAngle) * beachLimit;
@@ -3136,7 +3823,7 @@
       dummy.rightKnee.rotation.set(0, 0, 0);
       dummy.pelvis.position.y = 1.6;
 
-      if (state.dummy.isDead) {
+      if (state.dummy.isDead && !state.dummy.isSuperLaunching) {
         dummy.pelvis.position.y = 0.22;
         dummy.pelvis.rotation.x = -Math.PI / 2;
         dummy.torso.rotation.set(0, 0, 0);
@@ -3145,6 +3832,16 @@
         dummy.rightLegPivot.rotation.set(0, 0, -0.1);
         dummy.leftArmPivot.rotation.set(0, 0, 0.5);
         dummy.rightArmPivot.rotation.set(0, 0, -0.5);
+      } else if (state.dummy.state === 'BLOCK_BROKEN') {
+        dummy.pelvis.position.y = 1.45;
+        dummy.torso.rotation.x = -0.4;
+        dummy.head.rotation.x = -0.5;
+        dummy.leftArmPivot.rotation.set(-0.2, 0, -1.35);
+        dummy.rightArmPivot.rotation.set(-0.2, 0, 1.35);
+        dummy.leftElbow.rotation.x = -0.2;
+        dummy.rightElbow.rotation.x = -0.2;
+        dummy.leftLegPivot.rotation.x = -0.3;
+        dummy.rightLegPivot.rotation.x = 0.4;
       } else if (state.dummy.isHeadInGround) {
         dummy.pelvis.position.y = 1.35;
         dummy.pelvis.rotation.set(0, 0, 0);
@@ -3157,6 +3854,15 @@
         dummy.rightKnee.rotation.set(-0.3, 0, 0);
         dummy.leftArmPivot.rotation.set(-Math.PI * 0.9, 0, 0.35);
         dummy.rightArmPivot.rotation.set(-Math.PI * 0.9, 0, -0.35);
+      } else if (state.dummy.state === 'RAGDOLL') {
+        dummy.pelvis.position.y = 0.22;
+        dummy.pelvis.rotation.x = -Math.PI / 2;
+        dummy.torso.rotation.set(0, 0, 0);
+        dummy.head.rotation.set(-0.2, 0, 0);
+        dummy.leftLegPivot.rotation.set(0, 0, 0.1);
+        dummy.rightLegPivot.rotation.set(0, 0, -0.1);
+        dummy.leftArmPivot.rotation.set(0, 0, 0.4);
+        dummy.rightArmPivot.rotation.set(0, 0, -0.4);
       } else if (state.dummy.state === 'LAUNCHED_BACK') {
         dummy.pelvis.position.y = 1.7;
         dummy.torso.rotation.x = -0.7;
@@ -3170,15 +3876,6 @@
         dummy.head.rotation.x = 0.5;
         dummy.leftArmPivot.rotation.x = 0.3;
         dummy.rightArmPivot.rotation.x = 0.3;
-      } else if (state.dummy.state === 'RAGDOLL') {
-        dummy.pelvis.position.y = 0.22;
-        dummy.pelvis.rotation.x = -Math.PI / 2;
-        dummy.torso.rotation.set(0, 0, 0);
-        dummy.head.rotation.set(-0.2, 0, 0);
-        dummy.leftLegPivot.rotation.set(0, 0, 0.1);
-        dummy.rightLegPivot.rotation.set(0, 0, -0.1);
-        dummy.leftArmPivot.rotation.set(0, 0, 0.4);
-        dummy.rightArmPivot.rotation.set(0, 0, -0.4);
       } else if (state.dummy.isBlocking) {
         dummy.rightArmPivot.rotation.x = -Math.PI / 1.9;
         dummy.rightArmPivot.rotation.y = -0.55;
@@ -3250,6 +3947,24 @@
         yuji.rightLegPivot.rotation.set(0, 0, -0.1);
         yuji.leftArmPivot.rotation.set(0, 0, 0.5);
         yuji.rightArmPivot.rotation.set(0, 0, -0.5);
+      } else if (state.player.state === 'BLOCK_BROKEN') {
+        yuji.pelvis.position.y = 1.45;
+        yuji.torso.rotation.x = -0.4;
+        yuji.head.rotation.x = -0.55;
+        yuji.leftArmPivot.rotation.set(-0.2, 0, -1.35);
+        yuji.rightArmPivot.rotation.set(-0.2, 0, 1.35);
+        yuji.leftElbow.rotation.x = -0.2;
+        yuji.rightElbow.rotation.x = -0.2;
+        yuji.leftLegPivot.rotation.x = -0.3;
+        yuji.rightLegPivot.rotation.x = 0.4;
+      } else if (state.player.state === 'STUNNED') {
+        yuji.pelvis.position.y = 1.5;
+        yuji.torso.rotation.x = 0.45;
+        yuji.head.rotation.x = 0.5;
+        yuji.leftArmPivot.rotation.x = 0.35;
+        yuji.rightArmPivot.rotation.x = 0.35;
+        yuji.leftLegPivot.rotation.x = -0.2;
+        yuji.rightLegPivot.rotation.x = 0.2;
       } else if (state.player.state === 'ATTACKING') {
         const move = state.player.currentMove;
 
@@ -3490,7 +4205,6 @@
         yuji.rightKnee.rotation.x = -0.1;
       }
 
-      // Shockwave rings decay
       for (let i = activeShockwaves.length - 1; i >= 0; i--) {
         const sw = activeShockwaves[i];
         sw.life -= dt;
@@ -3507,7 +4221,23 @@
         }
       }
 
-      // Black Flash lightning decay
+      for (let i = glassShards.length - 1; i >= 0; i--) {
+        const sh = glassShards[i];
+        sh.life -= dt;
+        sh.vel.y -= 20 * dt;
+        sh.mesh.position.addScaledVector(sh.vel, dt);
+        sh.mesh.rotation.x += sh.rot.x * dt;
+        sh.mesh.rotation.y += sh.rot.y * dt;
+        sh.mesh.material.opacity = Math.max(0, sh.life / 0.8);
+
+        if (sh.life <= 0) {
+          scene.remove(sh.mesh);
+          sh.mesh.geometry.dispose();
+          sh.mesh.material.dispose();
+          glassShards.splice(i, 1);
+        }
+      }
+
       for (let i = activeLightning.length - 1; i >= 0; i--) {
         const item = activeLightning[i];
         item.life -= dt;
@@ -3520,7 +4250,6 @@
         }
       }
 
-      // Arena Debris Physics
       for (let i = activeDebris.length - 1; i >= 0; i--) {
         const deb = activeDebris[i];
         deb.life -= dt;
@@ -3543,7 +4272,6 @@
         }
       }
 
-      // Camera Orbit & Shift Lock Offset
       const camDist = state.camera.dist * (state.player.inZone ? 0.9 : 1.0);
       const camTarget = yuji.root.position.clone().add(state.camera.targetOffset);
 
@@ -3586,8 +4314,46 @@
       }
 
       const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      
+      // Manage mobile control overlays
       if (joystick) {
         joystick.style.display = isTouchDevice ? 'flex' : 'none';
+      }
+      const mobileDash = document.getElementById('mobile-dash-btn');
+      if (mobileDash) {
+        mobileDash.style.display = isTouchDevice ? 'flex' : 'none';
+      }
+      const mobileJump = document.getElementById('mobile-jump-btn');
+      if (mobileJump) {
+        mobileJump.style.display = isTouchDevice ? 'flex' : 'none';
+      }
+      const mobileGuard = document.getElementById('mobile-guard-btn');
+      if (mobileGuard) {
+        mobileGuard.style.display = isTouchDevice ? 'flex' : 'none';
+      }
+      const mobileM1 = document.getElementById('mobile-m1-btn');
+      if (mobileM1) {
+        mobileM1.style.display = isTouchDevice ? 'flex' : 'none';
+      }
+
+      // Hide or show hotbar Jump, Guard, and Dash buttons based on touch device detection
+      const hotbarJump = document.getElementById('btn-jump');
+      const hotbarGuard = document.getElementById('btn-block');
+      const hotbarDash = document.getElementById('btn-dash');
+      if (hotbarJump) {
+        hotbarJump.style.display = isTouchDevice ? 'none' : 'flex';
+      }
+      if (hotbarGuard) {
+        hotbarGuard.style.display = isTouchDevice ? 'none' : 'flex';
+      }
+      if (hotbarDash) {
+        hotbarDash.style.display = isTouchDevice ? 'none' : 'flex';
+      }
+
+      if (isTouchDevice) {
+        document.body.classList.add('mobile-controls-active');
+      } else {
+        document.body.classList.remove('mobile-controls-active');
       }
     }
 
